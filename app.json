@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "SyncQuiz",
+    "slug": "syncquiz-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "syncquiz",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#090d16"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.college.syncquiz",
+      "associatedDomains": [
+        "applinks:syncquiz.app"
+      ],
+      "infoPlist": {
+        "NSCameraUsageDescription": "SyncQuiz uses your camera to scan quiz QR codes."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#090d16"
+      },
+      "package": "com.college.syncquiz",
+      "permissions": [
+        "CAMERA"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "syncquiz.app",
+              "pathPrefix": "/join"
+            },
+            {
+              "scheme": "syncquiz",
+              "host": "join"
+            },
+            {
+              "scheme": "quizapp",
+              "host": "join"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SyncQuiz to access your camera to scan quiz QR codes."
+        }
+      ]
+    ]
+  }
+}

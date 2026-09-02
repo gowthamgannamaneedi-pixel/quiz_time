@@ -1,0 +1,41 @@
+{
+  "name": "syncquiz-mobile",
+  "version": "1.0.0",
+  "main": "expo-router/entry",
+  "scripts": {
+    "dev": "expo start --web --host lan",
+    "start": "expo start --host lan",
+    "android": "expo start --android --host lan",
+    "ios": "expo start --ios --host lan",
+    "web": "expo start --web --host lan",
+    "build": "expo export -p web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~6.1.1",
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "expo": "~57.0.19",
+    "expo-barcode-scanner": "~13.0.1",
+    "expo-camera": "~17.0.9",
+    "expo-constants": "~18.0.13",
+    "expo-linking": "~8.0.9",
+    "expo-router": "~57.0.18",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-native": "0.85.1",
+    "react-native-qrcode-svg": "^6.3.21",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "react-native-svg": "15.15.1",
+    "react-native-web": "~0.21.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.18",
+    "@types/ws": "^8.18.1",
+    "typescript": "~6.0.2"
+  },
+  "private": true
+}
