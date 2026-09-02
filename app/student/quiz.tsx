@@ -126,7 +126,7 @@ export default function StudentQuizScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Top Examination Bar: [NIAT LOGO]    ⏱ 00:20    1/6 */}
+      {/* Top Examination Bar: [NIAT LOGO]    ⏱ 00:20    1/10 */}
       <View style={styles.topBar}>
         <View style={styles.topBarBrandCol}>
           <BrandLogo size="sm" />
@@ -135,7 +135,7 @@ export default function StudentQuizScreen() {
         {/* Live Authoritative 20-Second Question Timer */}
         <TimerBadge secondsRemaining={timeLeft} />
 
-        {/* Question Counter Badge e.g. 1/6 */}
+        {/* Question Counter Badge e.g. 1/10 */}
         <View style={styles.qCounterBadge}>
           <Text style={styles.qCounterText}>
             {currentIndex + 1}/{totalQuestions}

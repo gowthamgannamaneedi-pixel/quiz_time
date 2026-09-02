@@ -1,8 +1,11 @@
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const os = require('os');
 const { WebSocketServer, WebSocket } = require('ws');
 
 const PORT = 8082;
+const WEB_PORT = 8081;
 const HOST = '0.0.0.0';
 
 function getActiveLanIpv4() {
@@ -721,13 +724,59 @@ wss.on('connection', (ws, req) => {
   });
 });
 
+// Static file server for dist/ on WEB_PORT (8081) with SPA routing
+const mimeTypes = {
+  '.html': 'text/html',
+  '.js': 'application/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.ttf': 'font/ttf',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+};
+
+const webServer = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const cleanPath = decodeURIComponent(parsedUrl.pathname).replace(/^\/+/, '');
+  let filePath = cleanPath ? path.join(__dirname, 'dist', cleanPath) : path.join(__dirname, 'dist', 'index.html');
+
+  fs.stat(filePath, (err, stats) => {
+    if (err || stats.isDirectory()) {
+      filePath = path.join(__dirname, 'dist', 'index.html');
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+    fs.readFile(filePath, (readErr, content) => {
+      if (readErr) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Not Found');
+      } else {
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content);
+      }
+    });
+  });
+});
+
+webServer.listen(WEB_PORT, HOST, () => {
+  console.log(`🌐 Static Web Server listening on: http://${HOST}:${WEB_PORT}`);
+});
+
 server.listen(PORT, HOST, () => {
   const lanIp = getActiveLanIpv4();
   console.log('====================================================');
   console.log(`🚀 NIAT REALTIME QUIZ SERVER (Single Source of Truth)`);
   console.log(`📡 Listening on: http://${HOST}:${PORT}`);
   console.log(`🌐 Local LAN IPv4: ${lanIp}`);
-  console.log(`🔗 Universal Join URL: http://${lanIp}:8081/join/${activeSession.quizId}?pin=${activeSession.pin}`);
+  console.log(`🔗 Universal Join URL: http://${lanIp}:${WEB_PORT}/join/${activeSession.quizId}?pin=${activeSession.pin}`);
   console.log(`⚡ WebSocket Server: ws://${HOST}:${PORT}`);
   console.log(`📚 Active Questions: ${DEFAULT_QUESTIONS.length} Questions (Duration: ${activeSession.durationSeconds}s)`);
   console.log('====================================================');

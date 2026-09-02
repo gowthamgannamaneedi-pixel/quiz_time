@@ -64,8 +64,8 @@ export default function QuizSettingsScreen() {
 
     const cleanPin = pin.trim();
     const cleanTitle = title.trim();
-    const cleanCategory = category.trim();
-    const cleanDescription = description.trim();
+    const cleanCategory = (category || '').trim();
+    const cleanDescription = (description || '').trim();
 
     updateQuizSettings({
       title: cleanTitle,

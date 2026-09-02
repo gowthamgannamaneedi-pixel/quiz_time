@@ -19,12 +19,18 @@ export type ParticipantStatus = 'WAITING' | 'LIVE' | 'SUBMITTED' | 'DISCONNECTED
 
 export interface Participant {
   participantId: string;
-  sessionId: string;
-  quizId: string;
+  sessionId?: string;
+  quizId?: string;
   name: string;
   status: ParticipantStatus;
-  joinedAt: number;
-  submittedAt?: number | null;
+  joinedAt: number | string;
+  submittedAt?: number | string | null;
+  score?: number;
+  totalMarks?: number;
+  timeTakenSeconds?: number;
+  correctCount?: number;
+  totalQuestions?: number;
+  answers?: Record<string, 'A' | 'B' | 'C' | 'D' | null | string>;
 }
 
 export interface LeaderboardEntry {
@@ -48,12 +54,12 @@ export interface QuizSession {
   category?: string;
   description?: string;
   status: QuizStatus;
-  startedAt: number | null; // Epoch ms timestamp when Admin starts the quiz
-  endedAt: number | null;   // Epoch ms timestamp when Admin ends the quiz
+  startedAt?: number | null;
+  endedAt?: number | null;
   durationSeconds?: number;
-  defaultQuestionTime?: number; // Default per-question seconds (e.g. 20)
-  questions?: Question[];   // Authoritative shared questions list (Single Source of Truth)
-  joinedQuizId: string | null;
+  defaultQuestionTime?: number;
+  questions?: Question[];
+  joinedQuizId?: string | null;
   connectedStudents?: number;
   participants?: Participant[];
   leaderboard?: LeaderboardEntry[];
@@ -63,29 +69,22 @@ export interface QuizSession {
 
 export interface Quiz {
   id: string;
-  pin: string; // 6-digit numeric PIN e.g. "123456"
-  title: string;
-  category: string;
-  description: string;
-  durationSeconds: number;
-  defaultQuestionTime?: number; // Default per-question seconds (default 20)
-  status: QuizStatus;
-  startedAt: number | null;
-  endedAt: number | null;
-  questions: Question[];
-  connectedStudents?: number;
-}
-
-export interface QuizQRPayload {
-  type: 'QUIZ_JOIN';
-  quizId: string;
   pin: string;
+  title: string;
+  category?: string;
+  description?: string;
+  durationSeconds: number;
+  defaultQuestionTime?: number; // default per-question seconds (default 20)
+  status: QuizStatus;
+  startedAt?: number | null;
+  endedAt?: number | null;
+  questions: Question[];
 }
 
 export interface QuizResult {
   quizId: string;
-  quizTitle: string;
-  pin: string;
+  quizTitle?: string;
+  pin?: string;
   totalQuestions: number;
   correctCount: number;
   wrongCount: number;
@@ -94,6 +93,12 @@ export interface QuizResult {
   maxScore: number;
   percentage: number;
   timeTakenSeconds: number;
-  answers: Record<string, 'A' | 'B' | 'C' | 'D' | null>;
-  submittedAt: string;
+  answers?: Record<string, 'A' | 'B' | 'C' | 'D' | null>;
+  submittedAt?: string;
+}
+
+export interface QuizQRPayload {
+  type: 'QUIZ_JOIN';
+  quizId: string;
+  pin: string;
 }

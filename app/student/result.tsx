@@ -58,7 +58,7 @@ export default function StudentResultScreen() {
   }
 
   const score = parseInt(params.score || '0', 10);
-  const maxScore = parseInt(params.maxScore || '40', 10);
+  const maxScore = parseInt(params.maxScore || '20', 10);
   const correctCount = parseInt(params.correctCount || '0', 10);
   const wrongCount = parseInt(params.wrongCount || '0', 10);
   const unansweredCount = parseInt(params.unansweredCount || '0', 10);
