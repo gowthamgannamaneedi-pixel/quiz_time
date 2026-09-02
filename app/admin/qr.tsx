@@ -26,7 +26,6 @@ import { theme } from '../../src/theme/colors';
 import {
   buildQuizJoinURL,
   getDetectedLanHost,
-  getBaseOrigin,
   isProductionEnvironment,
   PRODUCTION_DOMAIN,
 } from '../../src/utils/deepLink';
@@ -41,35 +40,38 @@ export default function AdminQRScreen() {
   const [customIp, setCustomIp] = useState<string>('');
   const [isEditingIp, setIsEditingIp] = useState(false);
 
+  // QR Mode: 'PRODUCTION' (Cloud public event) or 'LOCAL_LAN' (local hotspot testing)
+  const isProd = isProductionEnvironment();
+  const [qrMode, setQrMode] = useState<'PRODUCTION' | 'LOCAL_LAN'>(isProd ? 'PRODUCTION' : 'LOCAL_LAN');
+
   useEffect(() => {
     if (!isAdminAuthenticated()) {
       router.replace('/admin');
     }
   }, []);
 
-  const isProd = isProductionEnvironment();
   const activePin = sessionPin || quiz.pin;
 
-  // Dynamically resolve current computer LAN IPv4 for dev mode
+  // Dynamically resolve current computer LAN IPv4
   const detectedLanIp = session.lanIp || realtimeSession.getServerLanIp() || getDetectedLanHost().ip;
   const activeIp = (customIp && customIp.trim()) ? customIp.trim() : detectedLanIp;
 
   // Universal Join Link encoded in QR:
-  // In production -> https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
-  // In local dev  -> http://10.x.x.x:8081/join/quiz-college-2026?pin=123456
+  // PRODUCTION: https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
+  // LOCAL_LAN:  http://10.x.x.x:8081/join/quiz-college-2026?pin=123456
   const joinUrl = buildQuizJoinURL(
     quiz.id,
     activePin,
-    isProd ? getBaseOrigin() : undefined,
-    isProd ? undefined : activeIp
+    qrMode,
+    qrMode === 'LOCAL_LAN' ? activeIp : undefined
   );
 
-  // Auto-fetch fresh LAN IP on mount in dev
+  // Auto-fetch fresh LAN IP on mount
   useEffect(() => {
-    if (!isProd) {
+    if (qrMode === 'LOCAL_LAN') {
       handleRefreshLanIp();
     }
-  }, [isProd]);
+  }, [qrMode]);
 
   const handleRefreshLanIp = async () => {
     setIsRefreshingIp(true);
@@ -111,7 +113,7 @@ export default function AdminQRScreen() {
       // ignore
     }
     setCopiedNotice(true);
-    Alert.alert('Link Copied', `Universal Join Link copied to clipboard:\n${joinUrl}`);
+    Alert.alert('Link Copied', `Join Link copied to clipboard:\n${joinUrl}`);
     setTimeout(() => setCopiedNotice(false), 3000);
   };
 
@@ -120,28 +122,69 @@ export default function AdminQRScreen() {
       <Header showBack title="Official Universal Quiz QR" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* QR Mode Selector Toggle */}
+        <View style={styles.modeToggleContainer}>
+          <TouchableOpacity
+            style={[styles.modeTab, qrMode === 'PRODUCTION' && styles.modeTabActive]}
+            onPress={() => setQrMode('PRODUCTION')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="globe-outline"
+              size={18}
+              color={qrMode === 'PRODUCTION' ? theme.white : theme.brandTextSecondary}
+            />
+            <Text style={[styles.modeTabText, qrMode === 'PRODUCTION' && styles.modeTabTextActive]}>
+              Public Production Cloud
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.modeTab, qrMode === 'LOCAL_LAN' && styles.modeTabActive]}
+            onPress={() => setQrMode('LOCAL_LAN')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="wifi-outline"
+              size={18}
+              color={qrMode === 'LOCAL_LAN' ? theme.white : theme.brandTextSecondary}
+            />
+            <Text style={[styles.modeTabText, qrMode === 'LOCAL_LAN' && styles.modeTabTextActive]}>
+              Local Wi-Fi / Hotspot
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Network & Origin Status Bar */}
         <View style={styles.networkStatusCard}>
           <View style={styles.networkStatusLeft}>
-            <View style={[styles.wifiIndicator, isProd && styles.prodIndicator]}>
-              <Ionicons name={isProd ? "cloud-done" : "wifi"} size={16} color={isProd ? theme.brandBurgundy : theme.success} />
+            <View style={[styles.wifiIndicator, qrMode === 'PRODUCTION' && styles.prodIndicator]}>
+              <Ionicons
+                name={qrMode === 'PRODUCTION' ? "cloud-done" : "wifi"}
+                size={16}
+                color={qrMode === 'PRODUCTION' ? theme.brandBurgundy : theme.success}
+              />
             </View>
-            <View>
+            <View style={{ flex: 1 }}>
               <Text style={styles.networkStatusTitle}>
-                {isProd ? 'Production Cloud Origin' : 'Active LAN IPv4 Address'}
+                {qrMode === 'PRODUCTION' ? 'Public Production Cloud Origin' : 'Active Local LAN IPv4'}
               </Text>
               <Text style={styles.networkStatusIp}>
-                {isProd ? PRODUCTION_DOMAIN : `${activeIp}:8081`}
+                {qrMode === 'PRODUCTION' ? PRODUCTION_DOMAIN : `${activeIp}:8081`}
+              </Text>
+              <Text style={styles.networkStatusSub}>
+                {qrMode === 'PRODUCTION'
+                  ? 'Zero Login Required • Direct Student Access'
+                  : 'For devices on the same Wi-Fi / Hotspot'}
               </Text>
             </View>
           </View>
 
-          {!isProd && (
+          {qrMode === 'LOCAL_LAN' && (
             <View style={styles.networkStatusActions}>
               <TouchableOpacity
-                activeOpacity={0.7}
+                style={styles.actionIconBtn}
                 onPress={handleRefreshLanIp}
-                style={styles.refreshIconButton}
                 disabled={isRefreshingIp}
               >
                 {isRefreshingIp ? (
@@ -152,94 +195,118 @@ export default function AdminQRScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                activeOpacity={0.7}
+                style={styles.actionIconBtn}
                 onPress={() => setIsEditingIp(!isEditingIp)}
-                style={styles.editIconButton}
               >
-                <Ionicons name={isEditingIp ? 'close' : 'create-outline'} size={16} color={theme.brandTextSecondary} />
+                <Ionicons name={isEditingIp ? "close" : "create-outline"} size={16} color={theme.brandBurgundy} />
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        {/* Optional Manual IP Override in local dev */}
-        {!isProd && isEditingIp && (
-          <View style={styles.manualIpBox}>
-            <Text style={styles.manualIpLabel}>Custom LAN IPv4 Override:</Text>
-            <View style={styles.manualIpInputRow}>
+        {/* Manual LAN IP Editor in Dev Mode */}
+        {qrMode === 'LOCAL_LAN' && isEditingIp && (
+          <View style={styles.ipEditCard}>
+            <Text style={styles.ipEditLabel}>Custom LAN IPv4 Address:</Text>
+            <View style={styles.ipInputRow}>
               <TextInput
-                style={styles.manualIpInput}
+                style={styles.ipInput}
                 value={customIp}
-                placeholder={detectedLanIp}
+                placeholder={detectedLanIp || '10.x.x.x'}
                 placeholderTextColor={theme.brandTextMuted}
                 onChangeText={setCustomIp}
                 autoCapitalize="none"
-                autoCorrect={false}
+                keyboardType="numbers-and-punctuation"
               />
-              {customIp ? (
-                <TouchableOpacity
-                  onPress={() => setCustomIp('')}
-                  style={styles.resetIpBtn}
-                >
-                  <Text style={styles.resetIpBtnText}>Reset</Text>
-                </TouchableOpacity>
-              ) : null}
+              <TouchableOpacity
+                style={styles.ipSaveBtn}
+                onPress={() => {
+                  setIsEditingIp(false);
+                  Alert.alert('LAN IP Updated', `QR code updated with IP: ${activeIp}`);
+                }}
+              >
+                <Text style={styles.ipSaveBtnText}>APPLY</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
 
-        {/* Main QR Card */}
+        {/* Main High-Resolution QR Card */}
         <Card style={styles.qrCard}>
-          <BrandLogo size="md" showText subtitle="College Quiz 2026" style={{ marginBottom: 12 }} />
-
-          <View style={styles.badgeRow}>
-            <View style={styles.pinBadge}>
-              <Text style={styles.pinBadgeLabel}>PIN:</Text>
-              <Text style={styles.pinBadgeValue}>{activePin}</Text>
-            </View>
+          {/* Official Brand Logo */}
+          <View style={styles.brandContainer}>
+            <BrandLogo size="md" showText subtitle="Official Examination Center" />
           </View>
 
           <Text style={styles.quizTitle}>{quiz.title}</Text>
-          <Text style={styles.quizDesc}>
-            Project this QR code on screen. Students scan with normal phone camera or Google Lens to join immediately.
+
+          {/* Environment Status Badge */}
+          <View style={styles.envBadgeRow}>
+            <View style={[styles.envBadge, qrMode === 'PRODUCTION' ? styles.envBadgeProd : styles.envBadgeDev]}>
+              <Ionicons
+                name={qrMode === 'PRODUCTION' ? "checkmark-circle" : "hardware-chip-outline"}
+                size={14}
+                color={qrMode === 'PRODUCTION' ? theme.brandGold : theme.brandBurgundy}
+              />
+              <Text style={[styles.envBadgeText, qrMode === 'PRODUCTION' ? styles.envBadgeTextProd : styles.envBadgeTextDev]}>
+                {qrMode === 'PRODUCTION' ? 'PUBLIC PRODUCTION (NO LOGIN REQUIRED)' : 'LOCAL WI-FI / HOTSPOT'}
+              </Text>
+            </View>
+          </View>
+
+          {/* QR Code Container */}
+          <View style={styles.qrWrapper}>
+            <QRCodeDisplay
+              value={joinUrl}
+              size={240}
+            />
+          </View>
+
+          <Text style={styles.scanInstruction}>
+            Scan with any phone camera or student scanner to enter examination
           </Text>
 
-          {/* High Contrast QR Code encoding Universal Join Link */}
-          <View style={styles.qrWrapper}>
-            <QRCodeDisplay value={joinUrl} size={220} />
+          {/* Active 6-Digit PIN Display */}
+          <View style={styles.pinSection}>
+            <Text style={styles.pinLabel}>SESSION ACCESS PIN</Text>
+            <View style={styles.pinBox}>
+              <Text style={styles.pinText}>{activePin}</Text>
+            </View>
           </View>
 
-          {/* Prominent Generated URL Displayed Underneath QR */}
-          <View style={styles.qrUrlBox}>
-            <Text style={styles.qrUrlLabel}>SCAN TO JOIN</Text>
-            <Text style={styles.qrUrlText} selectable>{joinUrl}</Text>
-          </View>
-
-          <View style={styles.scanNotice}>
-            <Ionicons name="camera" size={16} color={theme.success} />
-            <Text style={styles.scanNoticeText}>
-              Universal Link: Scannable by phone camera or Student Scanner
+          {/* Encoded Universal URL Display */}
+          <View style={styles.urlBox}>
+            <Text style={styles.urlLabel}>Target Join URL:</Text>
+            <Text style={styles.urlText} numberOfLines={2}>
+              {joinUrl}
             </Text>
           </View>
         </Card>
 
-        {/* Action Buttons */}
-        <View style={styles.actionsRow}>
+        {/* Action Controls */}
+        <View style={styles.buttonContainer}>
           <Button
-            title="SHARE LINK"
-            onPress={handleShareLink}
-            style={{ flex: 1 }}
-            icon={<Ionicons name="share-social-outline" size={18} color={theme.white} />}
+            title={copiedNotice ? "COPIED TO CLIPBOARD!" : "COPY JOIN LINK"}
+            onPress={handleCopyLink}
+            variant={copiedNotice ? "primary" : "secondary"}
+            style={styles.actionBtn}
           />
 
           <Button
-            title={copiedNotice ? "LINK COPIED ✓" : "COPY LINK"}
-            variant="secondary"
-            onPress={handleCopyLink}
-            style={{ flex: 1 }}
-            icon={<Ionicons name="copy-outline" size={18} color={theme.brandTextSecondary} />}
+            title="SHARE EVENT DETAILS"
+            onPress={handleShareLink}
+            variant="primary"
+            style={styles.actionBtn}
           />
         </View>
+
+        {/* Back to Control Center */}
+        <Button
+          title="RETURN TO ADMIN DASHBOARD"
+          onPress={() => router.push('/admin')}
+          variant="outline"
+          style={styles.returnBtn}
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -251,47 +318,73 @@ const styles = StyleSheet.create({
     backgroundColor: theme.brandBackground,
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
+    paddingBottom: 40,
+  },
+  modeToggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: theme.brandText,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 119, 6, 0.3)',
+  },
+  modeTab: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingBottom: 36,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  modeTabActive: {
+    backgroundColor: theme.brandBurgundy,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+  },
+  modeTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.brandTextSecondary,
+  },
+  modeTabTextActive: {
+    color: theme.white,
   },
   networkStatusCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: theme.white,
-    borderRadius: 14,
     padding: 12,
+    borderRadius: 12,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: theme.brandBorder,
-    width: '100%',
-    maxWidth: 420,
-    shadowColor: '#101828',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
   },
   networkStatusLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
     flex: 1,
+    gap: 10,
   },
   wifiIndicator: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: theme.successSurface,
-    borderWidth: 1,
-    borderColor: theme.successBorder,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(18, 183, 106, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   prodIndicator: {
-    backgroundColor: theme.brandBurgundyLight,
-    borderColor: theme.brandBurgundyBorder,
+    backgroundColor: 'rgba(128, 13, 21, 0.12)',
   },
   networkStatusTitle: {
     fontSize: 11,
@@ -301,187 +394,192 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   networkStatusIp: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '800',
-    color: theme.brandText,
+    color: theme.brandBurgundy,
+  },
+  networkStatusSub: {
+    fontSize: 11,
+    color: theme.brandTextSecondary,
+    marginTop: 1,
   },
   networkStatusActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  refreshIconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: theme.brandBurgundyLight,
-    borderWidth: 1,
-    borderColor: theme.brandBurgundyBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editIconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: theme.brandSurfaceLight,
-    borderWidth: 1,
-    borderColor: theme.brandBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  manualIpBox: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: theme.white,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: theme.brandBorder,
-  },
-  manualIpLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.brandTextSecondary,
-    marginBottom: 6,
-  },
-  manualIpInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 8,
   },
-  manualIpInput: {
-    flex: 1,
-    height: 38,
-    backgroundColor: theme.brandSurfaceLight,
-    borderWidth: 1,
-    borderColor: theme.brandBorder,
+  actionIconBtn: {
+    width: 32,
+    height: 32,
     borderRadius: 8,
-    paddingHorizontal: 10,
-    fontSize: 13,
-    fontFamily: 'monospace',
-    color: theme.brandText,
+    backgroundColor: 'rgba(128, 13, 21, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  resetIpBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: theme.brandBurgundyLight,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.brandBurgundyBorder,
-  },
-  resetIpBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.brandBurgundy,
-  },
-  qrCard: {
-    width: '100%',
-    maxWidth: 420,
+  ipEditCard: {
     backgroundColor: theme.white,
-    borderColor: theme.brandBorder,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#101828',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  badgeRow: {
-    marginBottom: 10,
-  },
-  pinBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.brandBurgundyLight,
-    borderWidth: 1.5,
-    borderColor: theme.brandBurgundyBorder,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    padding: 12,
     borderRadius: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: theme.brandBorder,
   },
-  pinBadgeLabel: {
+  ipEditLabel: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: theme.brandBurgundy,
-    letterSpacing: 1,
-  },
-  pinBadgeValue: {
-    fontSize: 20,
-    fontWeight: '900',
-    fontFamily: 'monospace',
-    color: theme.brandBurgundy,
-    letterSpacing: 2,
-  },
-  quizTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: theme.brandText,
-    textAlign: 'center',
     marginBottom: 6,
   },
-  quizDesc: {
+  ipInputRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ipInput: {
+    flex: 1,
+    height: 38,
+    borderWidth: 1,
+    borderColor: theme.brandBorder,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    color: theme.brandText,
+    backgroundColor: theme.brandSurfaceLight,
+  },
+  ipSaveBtn: {
+    backgroundColor: theme.brandBurgundy,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ipSaveBtnText: {
+    color: theme.white,
     fontSize: 12,
-    color: theme.brandTextSecondary,
+    fontWeight: '700',
+  },
+  qrCard: {
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.brandBorder,
+  },
+  brandContainer: {
+    marginBottom: 10,
+  },
+  quizTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.brandBurgundy,
     textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
-    maxWidth: 320,
+    marginBottom: 8,
+  },
+  envBadgeRow: {
+    marginBottom: 16,
+  },
+  envBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    gap: 6,
+  },
+  envBadgeProd: {
+    backgroundColor: theme.brandText,
+    borderWidth: 1,
+    borderColor: theme.brandGold,
+  },
+  envBadgeDev: {
+    backgroundColor: 'rgba(128, 13, 21, 0.08)',
+    borderWidth: 1,
+    borderColor: theme.brandBurgundy,
+  },
+  envBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  envBadgeTextProd: {
+    color: theme.brandGold,
+  },
+  envBadgeTextDev: {
+    color: theme.brandBurgundy,
   },
   qrWrapper: {
     padding: 16,
     backgroundColor: theme.white,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: theme.brandBurgundy,
-    shadowColor: '#101828',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(217, 119, 6, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
     marginBottom: 16,
   },
-  qrUrlBox: {
-    width: '100%',
-    backgroundColor: theme.brandSurfaceLight,
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: theme.brandBorder,
-    alignItems: 'center',
-    marginBottom: 12,
+  scanInstruction: {
+    fontSize: 13,
+    color: theme.brandTextSecondary,
+    textAlign: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 10,
   },
-  qrUrlLabel: {
-    fontSize: 9,
+  pinSection: {
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 14,
+  },
+  pinLabel: {
+    fontSize: 11,
     fontWeight: '800',
     color: theme.brandTextSecondary,
-    letterSpacing: 1,
-    marginBottom: 2,
+    letterSpacing: 1.5,
+    marginBottom: 6,
   },
-  qrUrlText: {
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: 'monospace',
-    color: theme.brandBurgundy,
-    textAlign: 'center',
+  pinBox: {
+    backgroundColor: theme.brandText,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: theme.brandGold,
   },
-  scanNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  pinText: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: theme.brandGold,
+    letterSpacing: 6,
   },
-  scanNoticeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.brandTextSecondary,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 12,
+  urlBox: {
     width: '100%',
-    maxWidth: 420,
+    backgroundColor: theme.brandSurfaceLight,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.brandBorder,
+  },
+  urlLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: theme.brandTextSecondary,
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  urlText: {
+    fontSize: 12,
+    color: theme.brandBurgundy,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontWeight: '600',
+  },
+  buttonContainer: {
+    gap: 10,
+    marginBottom: 14,
+  },
+  actionBtn: {
+    width: '100%',
+  },
+  returnBtn: {
+    width: '100%',
   },
 });

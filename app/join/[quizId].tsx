@@ -35,7 +35,7 @@ export default function UniversalQuizJoinScreen() {
   const initialPin = Array.isArray(params.pin) ? params.pin[0] : params.pin || '';
 
   const { quiz } = useAdminQuiz();
-  const { pin: officialPin, status: sessionStatus, registerStudent } = useRealtimeSession();
+  const { pin: officialPin, status: sessionStatus, session, registerStudent } = useRealtimeSession();
 
   const [studentName, setStudentName] = useState(getStoredStudentName() || '');
   const [enteredPin, setEnteredPin] = useState(initialPin || officialPin || '');
@@ -43,7 +43,7 @@ export default function UniversalQuizJoinScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Validate matching quiz ID
-  const isMatchingQuiz = targetQuizId === quiz.id;
+  const isMatchingQuiz = !targetQuizId || targetQuizId === quiz.id || targetQuizId === session.quizId;
 
   // Auto-fill pin if param updates
   useEffect(() => {

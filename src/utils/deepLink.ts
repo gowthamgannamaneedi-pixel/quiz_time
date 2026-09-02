@@ -10,6 +10,10 @@ export interface ParsedQRResult {
   error?: string;
 }
 
+/**
+ * Stable, canonical public production URL.
+ * Never requests Vercel authentication or login.
+ */
 export const PRODUCTION_DOMAIN = 'https://quiz-time-chi.vercel.app';
 export const DEFAULT_LAN_PORT = '8081';
 
@@ -32,7 +36,6 @@ export const getDynamicServerLanIp = (): string | null => {
 export const isProductionEnvironment = (): boolean => {
   if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
     const { hostname, protocol } = window.location;
-    // If accessed via HTTPS or on vercel.app or any production domain
     if (protocol === 'https:') return true;
     if (hostname.includes('vercel.app')) return true;
     if (
@@ -64,8 +67,8 @@ export const getDetectedLanHost = (customLanIp?: string): { ip: string; port: st
     const port = window.location.port || DEFAULT_LAN_PORT;
     detectedPort = port;
 
-    // If client is already accessing from a remote IP (e.g. on student phone), use that hostname
-    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== '0.0.0.0' && hostname !== '::1') {
+    // If client is already accessing from a remote LAN IP, use that hostname
+    if (hostname && /^\d+\.\d+\.\d+\.\d+$/.test(hostname) && hostname !== '127.0.0.1' && hostname !== '0.0.0.0') {
       detectedIp = hostname;
     } else if (dynamicServerLanIp) {
       // If admin is browsing on localhost, use the server's real dynamically detected LAN IPv4
@@ -97,40 +100,44 @@ export const getDetectedLanHost = (customLanIp?: string): { ip: string; port: st
 };
 
 /**
- * Gets the current base origin for QR and link generation:
- * - In production web: Uses window.location.origin (e.g. https://quiz-time-chi.vercel.app) or PRODUCTION_DOMAIN
- * - In local dev: Uses the computer's current LAN host
+ * Gets the production origin strictly pinned to the public canonical domain
  */
-export const getBaseOrigin = (customLanIp?: string): string => {
-  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
-    const { hostname, origin, protocol } = window.location;
-    if (
-      protocol === 'https:' ||
-      hostname.includes('vercel.app') ||
-      (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1' && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname))
-    ) {
-      return origin && origin.startsWith('http') ? origin : PRODUCTION_DOMAIN;
-    }
-  }
+export const getProductionOrigin = (): string => {
+  return PRODUCTION_DOMAIN;
+};
 
-  if (process.env.NODE_ENV === 'production' && !customLanIp) {
-    return PRODUCTION_DOMAIN;
-  }
-
+/**
+ * Gets the local LAN origin for local WiFi testing
+ */
+export const getLocalLanOrigin = (customLanIp?: string): string => {
   return getDetectedLanHost(customLanIp).baseUrl;
 };
 
 /**
- * Builds a universal HTTPS or LAN join URL for a quiz:
- * In production: https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
- * In local LAN dev: http://10.174.246.113:8081/join/quiz-college-2026?pin=123456
+ * Gets the base origin for QR and link generation:
+ * - 'PRODUCTION': strictly returns https://quiz-time-chi.vercel.app (NEVER preview URLs)
+ * - 'LOCAL_LAN': returns the computer's reachable LAN IP (http://10.x.x.x:8081)
  */
-export const buildQuizJoinURL = (quizId: string, pin: string, baseUrl?: string, customIp?: string): string => {
-  let targetBase = baseUrl;
-  if (!targetBase) {
-    targetBase = getBaseOrigin(customIp);
+export const getBaseOrigin = (mode: 'PRODUCTION' | 'LOCAL_LAN' = 'PRODUCTION', customLanIp?: string): string => {
+  if (mode === 'PRODUCTION') {
+    return PRODUCTION_DOMAIN;
   }
-  const cleanBase = targetBase.replace(/\/+$/, '');
+  return getLocalLanOrigin(customLanIp);
+};
+
+/**
+ * Builds a universal HTTPS or LAN join URL for a quiz:
+ * In PRODUCTION: https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
+ * In LOCAL_LAN:  http://10.174.246.113:8081/join/quiz-college-2026?pin=123456
+ */
+export const buildQuizJoinURL = (
+  quizId: string,
+  pin: string,
+  mode: 'PRODUCTION' | 'LOCAL_LAN' = 'PRODUCTION',
+  customIp?: string
+): string => {
+  const base = mode === 'PRODUCTION' ? PRODUCTION_DOMAIN : getLocalLanOrigin(customIp);
+  const cleanBase = base.replace(/\/+$/, '');
   return `${cleanBase}/join/${encodeURIComponent(quizId)}?pin=${encodeURIComponent(pin)}`;
 };
 
@@ -231,10 +238,6 @@ export const parseQuizQRPayload = (rawText: string): ParsedQRResult => {
 
 /**
  * Extracts quizId and pin from an incoming HTTPS Universal Link or Deep Link URL
- * Supported formats:
- * - https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
- * - http://192.168.1.100:8081/join/quiz-college-2026?pin=123456
- * - syncquiz://join/quiz-college-2026?pin=123456
  */
 export const parseQuizURL = (url: string): { quizId?: string; pin?: string; isValid: boolean } => {
   if (!url || typeof url !== 'string') return { isValid: false };
