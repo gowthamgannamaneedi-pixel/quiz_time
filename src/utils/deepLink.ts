@@ -119,10 +119,10 @@ export const getLocalLanOrigin = (customLanIp?: string): string => {
  * - 'LOCAL_LAN': returns the computer's reachable LAN IP (http://10.x.x.x:8081)
  */
 export const getBaseOrigin = (mode: 'PRODUCTION' | 'LOCAL_LAN' = 'PRODUCTION', customLanIp?: string): string => {
-  if (mode === 'PRODUCTION') {
-    return PRODUCTION_DOMAIN;
+  if (mode === 'LOCAL_LAN') {
+    return getLocalLanOrigin(customLanIp);
   }
-  return getLocalLanOrigin(customLanIp);
+  return PRODUCTION_DOMAIN;
 };
 
 /**
@@ -136,7 +136,7 @@ export const buildQuizJoinURL = (
   mode: 'PRODUCTION' | 'LOCAL_LAN' = 'PRODUCTION',
   customIp?: string
 ): string => {
-  const base = mode === 'PRODUCTION' ? PRODUCTION_DOMAIN : getLocalLanOrigin(customIp);
+  const base = mode === 'LOCAL_LAN' ? getLocalLanOrigin(customIp) : PRODUCTION_DOMAIN;
   const cleanBase = base.replace(/\/+$/, '');
   return `${cleanBase}/join/${encodeURIComponent(quizId)}?pin=${encodeURIComponent(pin)}`;
 };

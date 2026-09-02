@@ -40,9 +40,8 @@ export default function AdminQRScreen() {
   const [customIp, setCustomIp] = useState<string>('');
   const [isEditingIp, setIsEditingIp] = useState(false);
 
-  // QR Mode: 'PRODUCTION' (Cloud public event) or 'LOCAL_LAN' (local hotspot testing)
-  const isProd = isProductionEnvironment();
-  const [qrMode, setQrMode] = useState<'PRODUCTION' | 'LOCAL_LAN'>(isProd ? 'PRODUCTION' : 'LOCAL_LAN');
+  // QR Mode: 'PRODUCTION' (Cloud public event, default) or 'LOCAL_LAN' (local hotspot testing)
+  const [qrMode, setQrMode] = useState<'PRODUCTION' | 'LOCAL_LAN'>('PRODUCTION');
 
   useEffect(() => {
     if (!isAdminAuthenticated()) {
@@ -56,15 +55,12 @@ export default function AdminQRScreen() {
   const detectedLanIp = session.lanIp || realtimeSession.getServerLanIp() || getDetectedLanHost().ip;
   const activeIp = (customIp && customIp.trim()) ? customIp.trim() : detectedLanIp;
 
-  // Universal Join Link encoded in QR:
+  // Universal Join Link encoded in QR & displayed under SCAN TO JOIN:
   // PRODUCTION: https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
   // LOCAL_LAN:  http://10.x.x.x:8081/join/quiz-college-2026?pin=123456
-  const joinUrl = buildQuizJoinURL(
-    quiz.id,
-    activePin,
-    qrMode,
-    qrMode === 'LOCAL_LAN' ? activeIp : undefined
-  );
+  const joinUrl = qrMode === 'LOCAL_LAN'
+    ? `http://${activeIp}:8081/join/${encodeURIComponent(quiz.id)}?pin=${encodeURIComponent(activePin)}`
+    : `https://quiz-time-chi.vercel.app/join/${encodeURIComponent(quiz.id)}?pin=${encodeURIComponent(activePin)}`;
 
   // Auto-fetch fresh LAN IP on mount
   useEffect(() => {
