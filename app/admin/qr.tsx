@@ -254,6 +254,14 @@ export default function AdminQRScreen() {
             </View>
           </View>
 
+          {/* SCAN TO JOIN Prominent Section */}
+          <View style={styles.scanToJoinHeaderBox}>
+            <Text style={styles.scanToJoinHeading}>SCAN TO JOIN</Text>
+            <Text style={styles.scanToJoinUrlText} numberOfLines={2} selectable>
+              {joinUrl}
+            </Text>
+          </View>
+
           {/* QR Code Container */}
           <View style={styles.qrWrapper}>
             <QRCodeDisplay
@@ -272,14 +280,6 @@ export default function AdminQRScreen() {
             <View style={styles.pinBox}>
               <Text style={styles.pinText}>{activePin}</Text>
             </View>
-          </View>
-
-          {/* Encoded Universal URL Display */}
-          <View style={styles.urlBox}>
-            <Text style={styles.urlLabel}>Target Join URL:</Text>
-            <Text style={styles.urlText} numberOfLines={2}>
-              {joinUrl}
-            </Text>
           </View>
         </Card>
 
@@ -505,6 +505,31 @@ const styles = StyleSheet.create({
   },
   envBadgeTextDev: {
     color: theme.brandBurgundy,
+  },
+  scanToJoinHeaderBox: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: theme.brandSurfaceLight,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.brandBorder,
+    marginBottom: 16,
+  },
+  scanToJoinHeading: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: theme.brandBurgundy,
+    letterSpacing: 1.5,
+    marginBottom: 4,
+  },
+  scanToJoinUrlText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.brandText,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   qrWrapper: {
     padding: 16,
