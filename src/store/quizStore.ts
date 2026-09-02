@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Quiz, Question, QuizStatus, QuizSession, QuizQRPayload } from '../types/quiz.types';
 import { realtimeSession } from '../services/realtimeSession';
+import { INITIAL_10_QUESTIONS } from '../data/initialQuestions';
 
 const STORAGE_KEY = '@syncquiz_active_quiz_v7';
 
@@ -15,148 +16,7 @@ export const INITIAL_QUIZ: Quiz = {
   status: 'READY',
   startedAt: null,
   endedAt: null,
-  questions: [
-    {
-      id: 'q1',
-      question: 'What is the main purpose of Code in Air?',
-      options: [
-        { key: 'A', text: 'Improve camera quality' },
-        { key: 'B', text: 'Control a computer using hand gestures' },
-        { key: 'C', text: 'Train a chatbot' },
-        { key: 'D', text: 'Create 3D models' },
-      ],
-      correctAnswer: 'B',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q2',
-      question: 'Which device provides the visual input for Code in Air?',
-      options: [
-        { key: 'A', text: 'Microphone' },
-        { key: 'B', text: 'Keyboard' },
-        { key: 'C', text: 'Webcam' },
-        { key: 'D', text: 'Speaker' },
-      ],
-      correctAnswer: 'C',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q3',
-      question: 'What does MediaPipe primarily do in this project?',
-      options: [
-        { key: 'A', text: 'Play audio' },
-        { key: 'B', text: 'Detect hand landmarks' },
-        { key: 'C', text: 'Control the monitor' },
-        { key: 'D', text: 'Store files' },
-      ],
-      correctAnswer: 'B',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q4',
-      question: 'How many landmarks are used to represent one hand in MediaPipe Hand Landmarker?',
-      options: [
-        { key: 'A', text: '10' },
-        { key: 'B', text: '15' },
-        { key: 'C', text: '21' },
-        { key: 'D', text: '25' },
-      ],
-      correctAnswer: 'C',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q5',
-      question: 'What is a hand landmark?',
-      options: [
-        { key: 'A', text: 'A camera setting' },
-        { key: 'B', text: 'A key point on the hand' },
-        { key: 'C', text: 'A type of gesture' },
-        { key: 'D', text: 'A screen coordinate' },
-      ],
-      correctAnswer: 'B',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q6',
-      question: 'Which technology is mainly responsible for webcam and image/frame processing?',
-      options: [
-        { key: 'A', text: 'NumPy' },
-        { key: 'B', text: 'Pillow' },
-        { key: 'C', text: 'OpenCV' },
-        { key: 'D', text: 'MediaPipe' },
-      ],
-      correctAnswer: 'C',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q7',
-      question: 'Which sequence best describes the Code in Air pipeline?',
-      options: [
-        { key: 'A', text: 'Action → Camera → Gesture → Landmark' },
-        { key: 'B', text: 'Camera → Landmarks → Gesture → Action' },
-        { key: 'C', text: 'Gesture → Camera → Action → Landmark' },
-        { key: 'D', text: 'Landmark → Action → Camera → Gesture' },
-      ],
-      correctAnswer: 'B',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q8',
-      question: 'If you wanted to add a new gesture to Code in Air, what would you need to do?',
-      options: [
-        { key: 'A', text: 'Replace the webcam' },
-        { key: 'B', text: 'Detect the gesture and map it to an action' },
-        { key: 'C', text: 'Remove MediaPipe' },
-        { key: 'D', text: 'Change the monitor' },
-      ],
-      correctAnswer: 'B',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q9',
-      question: 'What is the biggest idea behind Code in Air?',
-      options: [
-        { key: 'A', text: 'Making computers faster' },
-        { key: 'B', text: 'Turning visual data into meaningful interaction' },
-        { key: 'C', text: 'Replacing Python' },
-        { key: 'D', text: 'Improving internet speed' },
-      ],
-      correctAnswer: 'B',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-    {
-      id: 'q10',
-      question: 'Suppose your hand moves slightly while you are trying to maintain a pinch. Which mechanisms help keep the interaction stable?',
-      options: [
-        { key: 'A', text: 'Smoothing and hysteresis' },
-        { key: 'B', text: 'Pillow and screenshots' },
-        { key: 'C', text: 'ROI and saving' },
-        { key: 'D', text: 'Brush size and colors' },
-      ],
-      correctAnswer: 'A',
-      marks: 2,
-      negativeMarks: 0,
-      timeLimit: 20,
-    },
-  ],
+  questions: INITIAL_10_QUESTIONS,
 };
 
 const getSynchronousInitialQuiz = (): Quiz => {
@@ -193,7 +53,13 @@ let joinedQuizId: string | null = null;
 const listeners = new Set<(quiz: Quiz) => void>();
 
 const notify = () => {
-  listeners.forEach((listener) => listener({ ...currentQuiz }));
+  listeners.forEach((listener) => {
+    try {
+      listener({ ...currentQuiz });
+    } catch {
+      // ignore
+    }
+  });
   saveToStorage();
 };
 
@@ -304,6 +170,11 @@ export const quizStore = {
       status: 'WAITING',
     };
     notify();
+    try {
+      realtimeSession.adminOpenWaitingRoom();
+    } catch {
+      // ignore
+    }
   },
 
   startLiveQuiz: () => {
@@ -315,6 +186,11 @@ export const quizStore = {
       endedAt: null,
     };
     notify();
+    try {
+      realtimeSession.adminStartLiveQuiz();
+    } catch {
+      // ignore
+    }
   },
 
   endLiveQuiz: () => {
@@ -325,17 +201,27 @@ export const quizStore = {
       endedAt,
     };
     notify();
+    try {
+      realtimeSession.adminEndQuiz();
+    } catch {
+      // ignore
+    }
   },
 
   resetQuizSession: () => {
     currentQuiz = {
-      ...currentQuiz,
+      ...INITIAL_QUIZ,
       status: 'READY',
       startedAt: null,
       endedAt: null,
     };
     joinedQuizId = null;
     notify();
+    try {
+      realtimeSession.adminResetSession();
+    } catch {
+      // ignore
+    }
   },
 
   addQuestion: (question: Omit<Question, 'id'>) => {

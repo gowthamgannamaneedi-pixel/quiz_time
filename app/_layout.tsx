@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { parseQuizURL } from '../src/utils/deepLink';
 import { quizStore } from '../src/store/quizStore';
@@ -12,35 +13,41 @@ export default function RootLayout() {
   const router = useRouter();
 
   useEffect(() => {
-    realtimeSession.connect();
+    try {
+      realtimeSession.connect();
+    } catch {
+      // ignore
+    }
 
-    const processIncomingURL = (rawUrl: string) => {
-      if (!rawUrl) return;
-      const parsed = parseQuizURL(rawUrl);
+    if (Platform.OS !== 'web') {
+      const processIncomingURL = (rawUrl: string) => {
+        if (!rawUrl) return;
+        const parsed = parseQuizURL(rawUrl);
 
-      const activeQuiz = quizStore.getQuiz();
-      const targetId = parsed.quizId || activeQuiz.id;
-      const pinParam = parsed.pin ? `?pin=${parsed.pin}` : '';
+        const activeQuiz = quizStore.getQuiz();
+        const targetId = parsed.quizId || activeQuiz.id;
+        const pinParam = parsed.pin ? `?pin=${parsed.pin}` : '';
 
-      if (parsed.isValid) {
-        router.push(`/join/${encodeURIComponent(targetId)}${pinParam}` as any);
-      }
-    };
+        if (parsed.isValid) {
+          router.push(`/join/${encodeURIComponent(targetId)}${pinParam}` as any);
+        }
+      };
 
-    const handleUrl = (event: { url: string }) => {
-      processIncomingURL(event.url);
-    };
+      const handleUrl = (event: { url: string }) => {
+        processIncomingURL(event.url);
+      };
 
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        processIncomingURL(url);
-      }
-    });
+      Linking.getInitialURL().then((url) => {
+        if (url) {
+          processIncomingURL(url);
+        }
+      });
 
-    const subscription = Linking.addEventListener('url', handleUrl);
-    return () => {
-      subscription.remove();
-    };
+      const subscription = Linking.addEventListener('url', handleUrl);
+      return () => {
+        subscription.remove();
+      };
+    }
   }, []);
 
   return (

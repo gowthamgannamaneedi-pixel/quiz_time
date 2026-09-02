@@ -1,6 +1,7 @@
 import { getDetectedLanHost, setDynamicServerLanIp, getDynamicServerLanIp, isProductionEnvironment, PRODUCTION_DOMAIN } from '../utils/deepLink';
 import { QuizSession, QuizStatus, Participant, LeaderboardEntry, Question, QuizResult } from '../types/quiz.types';
-import { quizStore, INITIAL_QUIZ } from '../store/quizStore';
+import { INITIAL_10_QUESTIONS } from '../data/initialQuestions';
+import { quizStore } from '../store/quizStore';
 
 type SessionListener = (session: QuizSession) => void;
 
@@ -9,7 +10,7 @@ const SUPABASE_CHANNEL_TOPIC = 'realtime:quiz_college_2026';
 const SESSION_STORAGE_KEY = '@syncquiz_active_session_v9';
 
 class RealtimeSessionService {
-  private ws: WebSocket | null = null;
+  private ws: any = null;
   private listeners: Set<SessionListener> = new Set();
   private isConnecting: boolean = false;
   private reconnectTimer: any = null;
@@ -32,7 +33,7 @@ class RealtimeSessionService {
     endedAt: null,
     durationSeconds: 200,
     defaultQuestionTime: 20,
-    questions: INITIAL_QUIZ.questions,
+    questions: INITIAL_10_QUESTIONS,
     joinedQuizId: null,
     connectedStudents: 0,
     participants: [],
@@ -42,8 +43,11 @@ class RealtimeSessionService {
   };
 
   constructor() {
-    this.loadPersistedSession();
-    this.connect();
+    try {
+      this.loadPersistedSession();
+    } catch {
+      // ignore
+    }
   }
 
   private loadPersistedSession() {
@@ -56,7 +60,7 @@ class RealtimeSessionService {
             this.currentSession = {
               ...this.currentSession,
               ...parsed,
-              questions: (parsed.questions && parsed.questions.length === 10) ? parsed.questions : INITIAL_QUIZ.questions,
+              questions: (parsed.questions && parsed.questions.length === 10) ? parsed.questions : INITIAL_10_QUESTIONS,
             };
           }
         }
@@ -117,7 +121,13 @@ class RealtimeSessionService {
 
   private notify() {
     this.persistSession();
-    this.listeners.forEach((listener) => listener({ ...this.currentSession }));
+    this.listeners.forEach((listener) => {
+      try {
+        listener({ ...this.currentSession });
+      } catch {
+        // ignore
+      }
+    });
   }
 
   private updateSessionState(newSession: Partial<QuizSession>) {
@@ -136,7 +146,11 @@ class RealtimeSessionService {
     }
 
     if (Array.isArray(newSession.questions) && newSession.questions.length > 0) {
-      quizStore.syncQuestionsFromSession(newSession.questions);
+      try {
+        quizStore.syncQuestionsFromSession(newSession.questions);
+      } catch {
+        // ignore
+      }
     }
 
     this.currentSession = {
@@ -157,14 +171,15 @@ class RealtimeSessionService {
       participants: nextParticipants,
       leaderboard: nextLeaderboard,
       lanIp: newSession.lanIp || this.currentSession.lanIp,
-      joinBaseUrl: newSession.joinBaseUrl || this.currentSession.joinBaseUrl,
+      joinBaseUrl: newSession.joinBaseUrl || this.currentSession.joinBaseUrl || PRODUCTION_DOMAIN,
     };
 
     this.notify();
   }
 
   public connect() {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (typeof WebSocket === 'undefined') return;
+    if (this.ws && (this.ws.readyState === 1 || this.ws.readyState === 0)) {
       return;
     }
 
@@ -191,7 +206,7 @@ class RealtimeSessionService {
         this.broadcastEvent('REQUEST_SYNC', { clientTime: Date.now() });
       };
 
-      this.ws.onmessage = (event) => {
+      this.ws.onmessage = (event: any) => {
         try {
           const data = JSON.parse(event.data);
 
@@ -212,7 +227,6 @@ class RealtimeSessionService {
               }
               this.updateSessionState(innerPayload.session);
             } else if (innerEvent === 'REQUEST_SYNC') {
-              // If we are admin or have live session state, broadcast current state to synchronize new client
               if (this.currentSession.status !== 'DRAFT') {
                 this.broadcastEvent('SESSION_UPDATE', {
                   session: this.currentSession,
@@ -257,7 +271,7 @@ class RealtimeSessionService {
   }
 
   private joinChannel() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== 1) return;
 
     const joinMessage = {
       topic: SUPABASE_CHANNEL_TOPIC,
@@ -271,22 +285,30 @@ class RealtimeSessionService {
       ref: String(this.messageRefCounter++),
     };
 
-    this.ws.send(JSON.stringify(joinMessage));
+    try {
+      this.ws.send(JSON.stringify(joinMessage));
+    } catch {
+      // ignore
+    }
   }
 
   private sendHeartbeat() {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    if (!this.ws || this.ws.readyState !== 1) return;
 
-    this.ws.send(JSON.stringify({
-      topic: 'phoenix',
-      event: 'heartbeat',
-      payload: {},
-      ref: `hb_${this.messageRefCounter++}`,
-    }));
+    try {
+      this.ws.send(JSON.stringify({
+        topic: 'phoenix',
+        event: 'heartbeat',
+        payload: {},
+        ref: `hb_${this.messageRefCounter++}`,
+      }));
+    } catch {
+      // ignore
+    }
   }
 
   private broadcastEvent(eventName: string, payload: any) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && this.ws.readyState === 1) {
       const broadcastMsg = {
         topic: SUPABASE_CHANNEL_TOPIC,
         event: 'broadcast',
@@ -297,7 +319,11 @@ class RealtimeSessionService {
         },
         ref: String(this.messageRefCounter++),
       };
-      this.ws.send(JSON.stringify(broadcastMsg));
+      try {
+        this.ws.send(JSON.stringify(broadcastMsg));
+      } catch {
+        // ignore
+      }
     }
   }
 
