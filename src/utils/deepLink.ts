@@ -1,3 +1,6 @@
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
 export interface ParsedQRResult {
   isValid: boolean;
   type?: string;
@@ -7,101 +10,7 @@ export interface ParsedQRResult {
   error?: string;
 }
 
-/**
- * Validates and extracts quizId and PIN from QR payload formats:
- * FORMAT 1 (Official JSON): {"type":"QUIZ_JOIN","quizId":"quiz-college-2026","pin":"123456"}
- * FORMAT 2 (Legacy Deep Link): quizapp://quiz/123456
- * FORMAT 3 (Raw PIN String): 123456
- */
-export const parseQuizQRPayload = (rawText: string): ParsedQRResult => {
-  if (!rawText || typeof rawText !== 'string') {
-    return { isValid: false, error: 'Empty QR code data.' };
-  }
-
-  const trimmed = rawText.trim();
-
-  // FORMAT 1: Exact JSON payload
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (parsed && typeof parsed === 'object') {
-        if (parsed.type !== 'QUIZ_JOIN') {
-          return { isValid: false, error: 'Unrecognized QR type. Expected QUIZ_JOIN.' };
-        }
-        if (!parsed.quizId || typeof parsed.quizId !== 'string' || !parsed.quizId.trim()) {
-          return { isValid: false, error: 'QR payload missing quizId.' };
-        }
-        const pinStr = String(parsed.pin || '').trim();
-        if (!pinStr || !/^\d{6}$/.test(pinStr)) {
-          return { isValid: false, error: 'QR payload missing valid 6-digit PIN.' };
-        }
-        return {
-          isValid: true,
-          type: parsed.type,
-          quizId: parsed.quizId.trim(),
-          pin: pinStr,
-          format: 'FORMAT_1_JSON',
-        };
-      }
-    } catch {
-      // Continue to next checks if JSON parse fails
-    }
-  }
-
-  // FORMAT 2: Full URL (HTTPS, LAN IP http://10.10.8.81:8081/join/..., DeepLink)
-  const pinParamMatch = trimmed.match(/[?&]pin=(\d{6})/i) || trimmed.match(/\/(\d{6})\b/);
-  const joinPathMatch = trimmed.match(/\/join\/([^/?#]+)/i);
-  if (pinParamMatch || joinPathMatch) {
-    return {
-      isValid: true,
-      type: 'QUIZ_JOIN',
-      quizId: joinPathMatch ? decodeURIComponent(joinPathMatch[1]) : undefined,
-      pin: pinParamMatch ? pinParamMatch[1] : undefined,
-      format: 'FORMAT_2_DEEPLINK',
-    };
-  }
-
-  // FORMAT 3: Deep Link format (e.g. quizapp://quiz/123456)
-  if (trimmed.toLowerCase().includes('quizapp://') || trimmed.toLowerCase().includes('syncquiz://')) {
-    const pinMatch = trimmed.match(/\/(\d{6})\b/) || trimmed.match(/pin=(\d{6})/i);
-    if (pinMatch && pinMatch[1]) {
-      return {
-        isValid: true,
-        type: 'QUIZ_JOIN',
-        pin: pinMatch[1],
-        format: 'FORMAT_2_DEEPLINK',
-      };
-    }
-  }
-
-  // FORMAT 4: Exact 6-digit numeric PIN string (e.g. "123456")
-  if (/^\d{6}$/.test(trimmed)) {
-    return {
-      isValid: true,
-      type: 'QUIZ_JOIN',
-      pin: trimmed,
-      format: 'FORMAT_3_RAW_PIN',
-    };
-  }
-
-  // Fallback: Check if any standalone 6-digit sequence exists in rawText
-  const fallbackMatch = trimmed.match(/\b\d{6}\b/);
-  if (fallbackMatch) {
-    return {
-      isValid: true,
-      type: 'QUIZ_JOIN',
-      pin: fallbackMatch[0],
-      format: 'FORMAT_3_RAW_PIN',
-    };
-  }
-
-  return { isValid: false, error: 'Invalid Quiz QR code format.' };
-};
-
-import Constants from 'expo-constants';
-import { Platform } from 'react-native';
-
-export const DEFAULT_PRODUCTION_DOMAIN = 'https://syncquiz.app';
+export const PRODUCTION_DOMAIN = 'https://quiz-time-chi.vercel.app';
 export const DEFAULT_LAN_PORT = '8081';
 
 // Dynamic cache of the computer's active LAN IP reported by the backend server
@@ -115,6 +24,29 @@ export const setDynamicServerLanIp = (ip: string | null) => {
 
 export const getDynamicServerLanIp = (): string | null => {
   return dynamicServerLanIp;
+};
+
+/**
+ * Checks if the current execution context is in production (e.g. deployed on Vercel)
+ */
+export const isProductionEnvironment = (): boolean => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    const { hostname, protocol } = window.location;
+    // If accessed via HTTPS or on vercel.app or any production domain
+    if (protocol === 'https:') return true;
+    if (hostname.includes('vercel.app')) return true;
+    if (
+      hostname &&
+      hostname !== 'localhost' &&
+      hostname !== '127.0.0.1' &&
+      hostname !== '0.0.0.0' &&
+      !hostname.endsWith('.local') &&
+      !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)
+    ) {
+      return true;
+    }
+  }
+  return process.env.NODE_ENV === 'production';
 };
 
 /**
@@ -165,53 +97,153 @@ export const getDetectedLanHost = (customLanIp?: string): { ip: string; port: st
 };
 
 /**
+ * Gets the current base origin for QR and link generation:
+ * - In production web: Uses window.location.origin (e.g. https://quiz-time-chi.vercel.app) or PRODUCTION_DOMAIN
+ * - In local dev: Uses the computer's current LAN host
+ */
+export const getBaseOrigin = (customLanIp?: string): string => {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    const { hostname, origin, protocol } = window.location;
+    if (
+      protocol === 'https:' ||
+      hostname.includes('vercel.app') ||
+      (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1' && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname))
+    ) {
+      return origin && origin.startsWith('http') ? origin : PRODUCTION_DOMAIN;
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production' && !customLanIp) {
+    return PRODUCTION_DOMAIN;
+  }
+
+  return getDetectedLanHost(customLanIp).baseUrl;
+};
+
+/**
  * Builds a universal HTTPS or LAN join URL for a quiz:
- * Example: http://10.174.246.113:8081/join/quiz-college-2026?pin=123456
+ * In production: https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
+ * In local LAN dev: http://10.174.246.113:8081/join/quiz-college-2026?pin=123456
  */
 export const buildQuizJoinURL = (quizId: string, pin: string, baseUrl?: string, customIp?: string): string => {
   let targetBase = baseUrl;
   if (!targetBase) {
-    targetBase = getDetectedLanHost(customIp).baseUrl;
+    targetBase = getBaseOrigin(customIp);
   }
   const cleanBase = targetBase.replace(/\/+$/, '');
   return `${cleanBase}/join/${encodeURIComponent(quizId)}?pin=${encodeURIComponent(pin)}`;
 };
 
 /**
+ * Validates and extracts quizId and PIN from QR payload formats:
+ * FORMAT 1 (Official JSON): {"type":"QUIZ_JOIN","quizId":"quiz-college-2026","pin":"123456"}
+ * FORMAT 2 (Universal HTTPS URL & Deep Link): https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
+ * FORMAT 3 (Raw PIN String): 123456
+ */
+export const parseQuizQRPayload = (rawText: string): ParsedQRResult => {
+  if (!rawText || typeof rawText !== 'string') {
+    return { isValid: false, error: 'Empty QR code data.' };
+  }
+
+  const trimmed = rawText.trim();
+
+  // FORMAT 1: Exact JSON payload
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.type !== 'QUIZ_JOIN') {
+          return { isValid: false, error: 'Unrecognized QR type. Expected QUIZ_JOIN.' };
+        }
+        if (!parsed.quizId || typeof parsed.quizId !== 'string' || !parsed.quizId.trim()) {
+          return { isValid: false, error: 'QR payload missing quizId.' };
+        }
+        const pinStr = String(parsed.pin || '').trim();
+        if (!pinStr || !/^\d{6}$/.test(pinStr)) {
+          return { isValid: false, error: 'QR payload missing valid 6-digit PIN.' };
+        }
+        return {
+          isValid: true,
+          type: parsed.type,
+          quizId: parsed.quizId.trim(),
+          pin: pinStr,
+          format: 'FORMAT_1_JSON',
+        };
+      }
+    } catch {
+      // Continue to next checks if JSON parse fails
+    }
+  }
+
+  // FORMAT 2: Full URL (HTTPS Vercel URL, LAN IP URL, DeepLink)
+  // e.g. https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
+  const pinParamMatch = trimmed.match(/[?&]pin=(\d{6})/i) || trimmed.match(/\/join\/[^/]+\/(\d{6})\b/i);
+  const joinPathMatch = trimmed.match(/\/join\/([^/?#]+)/i);
+  if (pinParamMatch || joinPathMatch) {
+    const extractedQuizId = joinPathMatch ? decodeURIComponent(joinPathMatch[1]) : undefined;
+    const extractedPin = pinParamMatch ? pinParamMatch[1] : undefined;
+
+    return {
+      isValid: true,
+      type: 'QUIZ_JOIN',
+      quizId: extractedQuizId,
+      pin: extractedPin,
+      format: 'FORMAT_2_DEEPLINK',
+    };
+  }
+
+  // FORMAT 3: Deep Link format (e.g. syncquiz://join/quiz-college-2026?pin=123456)
+  if (trimmed.toLowerCase().includes('quizapp://') || trimmed.toLowerCase().includes('syncquiz://')) {
+    const pinMatch = trimmed.match(/pin=(\d{6})/i) || trimmed.match(/\/(\d{6})\b/);
+    const quizMatch = trimmed.match(/\/join\/([^/?#]+)/i) || trimmed.match(/\/quiz\/([^/?#]+)/i);
+    return {
+      isValid: true,
+      type: 'QUIZ_JOIN',
+      quizId: quizMatch ? decodeURIComponent(quizMatch[1]) : undefined,
+      pin: pinMatch ? pinMatch[1] : undefined,
+      format: 'FORMAT_2_DEEPLINK',
+    };
+  }
+
+  // FORMAT 4: Exact 6-digit numeric PIN string (e.g. "123456")
+  if (/^\d{6}$/.test(trimmed)) {
+    return {
+      isValid: true,
+      type: 'QUIZ_JOIN',
+      pin: trimmed,
+      format: 'FORMAT_3_RAW_PIN',
+    };
+  }
+
+  // Fallback: Check if any standalone 6-digit sequence exists in rawText
+  const fallbackMatch = trimmed.match(/\b\d{6}\b/);
+  if (fallbackMatch) {
+    return {
+      isValid: true,
+      type: 'QUIZ_JOIN',
+      pin: fallbackMatch[0],
+      format: 'FORMAT_3_RAW_PIN',
+    };
+  }
+
+  return { isValid: false, error: 'Invalid Quiz QR code format.' };
+};
+
+/**
  * Extracts quizId and pin from an incoming HTTPS Universal Link or Deep Link URL
  * Supported formats:
- * - https://syncquiz.app/join/quiz-college-2026?pin=123456
+ * - https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
  * - http://192.168.1.100:8081/join/quiz-college-2026?pin=123456
  * - syncquiz://join/quiz-college-2026?pin=123456
- * - quizapp://join/quiz-college-2026?pin=123456
  */
 export const parseQuizURL = (url: string): { quizId?: string; pin?: string; isValid: boolean } => {
   if (!url || typeof url !== 'string') return { isValid: false };
 
-  const trimmed = url.trim();
-
-  // Extract quizId from path /join/<quizId>
-  const joinPathMatch = trimmed.match(/\/join\/([^/?#]+)/i);
-  const quizId = joinPathMatch ? decodeURIComponent(joinPathMatch[1]) : undefined;
-
-  // Extract pin parameter ?pin=123456 or path fallback
-  const pinParamMatch = trimmed.match(/[?&]pin=(\d{6})/i) || trimmed.match(/\/(\d{6})\b/);
-  const pin = pinParamMatch ? pinParamMatch[1] : undefined;
-
-  if (quizId || pin) {
-    return {
-      isValid: true,
-      quizId,
-      pin,
-    };
-  }
-
-  // Fallback to parseQuizQRPayload
-  const qrRes = parseQuizQRPayload(trimmed);
+  const res = parseQuizQRPayload(url);
   return {
-    isValid: qrRes.isValid,
-    quizId: qrRes.quizId,
-    pin: qrRes.pin,
+    isValid: res.isValid,
+    quizId: res.quizId,
+    pin: res.pin,
   };
 };
 
@@ -219,12 +251,6 @@ export const parseQuizURL = (url: string): { quizId?: string; pin?: string; isVa
  * Backwards compatible helper returning only the PIN if valid
  */
 export const extractPinFromQR = (data: string): string | null => {
-  const parsedUrl = parseQuizURL(data);
-  if (parsedUrl.isValid && parsedUrl.pin) {
-    return parsedUrl.pin;
-  }
-  const res = parseQuizQRPayload(data);
-  return res.isValid && res.pin ? res.pin : null;
+  const parsed = parseQuizQRPayload(data);
+  return parsed.isValid && parsed.pin ? parsed.pin : null;
 };
-
-

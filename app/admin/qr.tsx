@@ -23,7 +23,13 @@ import { Button } from '../../src/components/Button';
 import { BrandLogo } from '../../src/components/BrandLogo';
 import { QRCodeDisplay } from '../../src/components/QRCodeDisplay';
 import { theme } from '../../src/theme/colors';
-import { buildQuizJoinURL, getDetectedLanHost } from '../../src/utils/deepLink';
+import {
+  buildQuizJoinURL,
+  getDetectedLanHost,
+  getBaseOrigin,
+  isProductionEnvironment,
+  PRODUCTION_DOMAIN,
+} from '../../src/utils/deepLink';
 import { isAdminAuthenticated } from '../../src/utils/adminAuth';
 
 export default function AdminQRScreen() {
@@ -41,20 +47,29 @@ export default function AdminQRScreen() {
     }
   }, []);
 
-  // Authoritative PIN
+  const isProd = isProductionEnvironment();
   const activePin = sessionPin || quiz.pin;
 
-  // Dynamically resolve current computer LAN IPv4
+  // Dynamically resolve current computer LAN IPv4 for dev mode
   const detectedLanIp = session.lanIp || realtimeSession.getServerLanIp() || getDetectedLanHost().ip;
   const activeIp = (customIp && customIp.trim()) ? customIp.trim() : detectedLanIp;
 
-  // Universal Join Link encoded in QR
-  const joinUrl = buildQuizJoinURL(quiz.id, activePin, undefined, activeIp);
+  // Universal Join Link encoded in QR:
+  // In production -> https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
+  // In local dev  -> http://10.x.x.x:8081/join/quiz-college-2026?pin=123456
+  const joinUrl = buildQuizJoinURL(
+    quiz.id,
+    activePin,
+    isProd ? getBaseOrigin() : undefined,
+    isProd ? undefined : activeIp
+  );
 
-  // Auto-fetch fresh LAN IP on mount
+  // Auto-fetch fresh LAN IP on mount in dev
   useEffect(() => {
-    handleRefreshLanIp();
-  }, []);
+    if (!isProd) {
+      handleRefreshLanIp();
+    }
+  }, [isProd]);
 
   const handleRefreshLanIp = async () => {
     setIsRefreshingIp(true);
@@ -105,44 +120,50 @@ export default function AdminQRScreen() {
       <Header showBack title="Official Universal Quiz QR" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Network & Dynamic LAN IP Status Bar */}
+        {/* Network & Origin Status Bar */}
         <View style={styles.networkStatusCard}>
           <View style={styles.networkStatusLeft}>
-            <View style={styles.wifiIndicator}>
-              <Ionicons name="wifi" size={16} color={theme.success} />
+            <View style={[styles.wifiIndicator, isProd && styles.prodIndicator]}>
+              <Ionicons name={isProd ? "cloud-done" : "wifi"} size={16} color={isProd ? theme.brandBurgundy : theme.success} />
             </View>
             <View>
-              <Text style={styles.networkStatusTitle}>Active LAN IPv4 Address</Text>
-              <Text style={styles.networkStatusIp}>{activeIp}:8081</Text>
+              <Text style={styles.networkStatusTitle}>
+                {isProd ? 'Production Cloud Origin' : 'Active LAN IPv4 Address'}
+              </Text>
+              <Text style={styles.networkStatusIp}>
+                {isProd ? PRODUCTION_DOMAIN : `${activeIp}:8081`}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.networkStatusActions}>
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleRefreshLanIp}
-              style={styles.refreshIconButton}
-              disabled={isRefreshingIp}
-            >
-              {isRefreshingIp ? (
-                <ActivityIndicator size="small" color={theme.brandBurgundy} />
-              ) : (
-                <Ionicons name="refresh" size={16} color={theme.brandBurgundy} />
-              )}
-            </TouchableOpacity>
+          {!isProd && (
+            <View style={styles.networkStatusActions}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleRefreshLanIp}
+                style={styles.refreshIconButton}
+                disabled={isRefreshingIp}
+              >
+                {isRefreshingIp ? (
+                  <ActivityIndicator size="small" color={theme.brandBurgundy} />
+                ) : (
+                  <Ionicons name="refresh" size={16} color={theme.brandBurgundy} />
+                )}
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => setIsEditingIp(!isEditingIp)}
-              style={styles.editIconButton}
-            >
-              <Ionicons name={isEditingIp ? 'close' : 'create-outline'} size={16} color={theme.brandTextSecondary} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setIsEditingIp(!isEditingIp)}
+                style={styles.editIconButton}
+              >
+                <Ionicons name={isEditingIp ? 'close' : 'create-outline'} size={16} color={theme.brandTextSecondary} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {/* Optional Manual IP Override */}
-        {isEditingIp && (
+        {/* Optional Manual IP Override in local dev */}
+        {!isProd && isEditingIp && (
           <View style={styles.manualIpBox}>
             <Text style={styles.manualIpLabel}>Custom LAN IPv4 Override:</Text>
             <View style={styles.manualIpInputRow}>
@@ -197,7 +218,7 @@ export default function AdminQRScreen() {
           <View style={styles.scanNotice}>
             <Ionicons name="camera" size={16} color={theme.success} />
             <Text style={styles.scanNoticeText}>
-              Universal Link: Scannable by normal phone camera / Lens
+              Universal Link: Scannable by phone camera or Student Scanner
             </Text>
           </View>
         </Card>
@@ -256,26 +277,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
   wifiIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: theme.successSurface,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
     borderColor: theme.successBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prodIndicator: {
+    backgroundColor: theme.brandBurgundyLight,
+    borderColor: theme.brandBurgundyBorder,
   },
   networkStatusTitle: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     color: theme.brandTextSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   networkStatusIp: {
     fontSize: 13,
     fontWeight: '800',
-    fontFamily: 'monospace',
     color: theme.brandText,
   },
   networkStatusActions: {
@@ -287,30 +314,30 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: theme.brandSurfaceLight,
+    backgroundColor: theme.brandBurgundyLight,
+    borderWidth: 1,
+    borderColor: theme.brandBurgundyBorder,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: theme.brandBorder,
   },
   editIconButton: {
     width: 32,
     height: 32,
     borderRadius: 8,
     backgroundColor: theme.brandSurfaceLight,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 1,
     borderColor: theme.brandBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   manualIpBox: {
+    width: '100%',
+    maxWidth: 420,
     backgroundColor: theme.white,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
     borderColor: theme.brandBorder,
-    width: '100%',
-    maxWidth: 420,
   },
   manualIpLabel: {
     fontSize: 11,
@@ -327,44 +354,50 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 38,
     backgroundColor: theme.brandSurfaceLight,
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: theme.brandBorder,
+    borderRadius: 8,
     paddingHorizontal: 10,
     fontSize: 13,
     fontFamily: 'monospace',
     color: theme.brandText,
   },
   resetIpBtn: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
+    backgroundColor: theme.brandBurgundyLight,
     borderRadius: 8,
-    backgroundColor: theme.brandSurfaceLight,
     borderWidth: 1,
-    borderColor: theme.brandBorder,
+    borderColor: theme.brandBurgundyBorder,
   },
   resetIpBtnText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: theme.brandTextSecondary,
+    color: theme.brandBurgundy,
   },
   qrCard: {
     width: '100%',
     maxWidth: 420,
-    alignItems: 'center',
-    textAlign: 'center',
     backgroundColor: theme.white,
     borderColor: theme.brandBorder,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#101828',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
   },
   badgeRow: {
-    marginBottom: 6,
+    marginBottom: 10,
   },
   pinBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     backgroundColor: theme.brandBurgundyLight,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: theme.brandBurgundyBorder,
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -374,6 +407,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: theme.brandBurgundy,
+    letterSpacing: 1,
   },
   pinBadgeValue: {
     fontSize: 20,
@@ -383,65 +417,61 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
   },
   quizTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     color: theme.brandText,
     textAlign: 'center',
-    marginTop: 6,
+    marginBottom: 6,
   },
   quizDesc: {
     fontSize: 12,
     color: theme.brandTextSecondary,
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 10,
     lineHeight: 18,
+    marginBottom: 20,
+    maxWidth: 320,
   },
   qrWrapper: {
-    padding: 10,
-    backgroundColor: theme.brandSurfaceLight,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.brandBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: theme.white,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: theme.brandBurgundy,
+    shadowColor: '#101828',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
+    marginBottom: 16,
   },
   qrUrlBox: {
+    width: '100%',
     backgroundColor: theme.brandSurfaceLight,
-    borderWidth: 1,
-    borderColor: theme.brandBorder,
     borderRadius: 10,
     padding: 10,
-    width: '100%',
-    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: theme.brandBorder,
     alignItems: 'center',
+    marginBottom: 12,
   },
   qrUrlLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: theme.brandBurgundy,
-    letterSpacing: 0.8,
-    marginBottom: 3,
+    fontSize: 9,
+    fontWeight: '800',
+    color: theme.brandTextSecondary,
+    letterSpacing: 1,
+    marginBottom: 2,
   },
   qrUrlText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     fontFamily: 'monospace',
-    color: theme.brandText,
+    color: theme.brandBurgundy,
     textAlign: 'center',
-    lineHeight: 16,
   },
   scanNotice: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: theme.brandSurfaceLight,
-    borderWidth: 1,
-    borderColor: theme.brandBorder,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    marginTop: 2,
   },
   scanNoticeText: {
     fontSize: 11,
