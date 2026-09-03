@@ -91,6 +91,7 @@ export default function UniversalQuizJoinScreen() {
     try {
       registerStudent(nameVal.cleanName, participantId);
       setIsJoined(true);
+      router.replace('/student/ready');
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to join session.');
     }

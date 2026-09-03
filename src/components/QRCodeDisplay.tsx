@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { theme } from '../theme/colors';
 
@@ -8,13 +8,27 @@ interface QRCodeDisplayProps {
   size?: number;
 }
 
-export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
+const QRCodeDisplayComponent: React.FC<QRCodeDisplayProps> = ({
   value,
   size = 220,
 }) => {
+  const containerDimension = size + 32;
+
   return (
     <View style={styles.wrapper}>
-      <View style={[styles.qrContainer, { width: size + 32, height: size + 32 }]}>
+      <View
+        style={[
+          styles.qrContainer,
+          {
+            width: containerDimension,
+            height: containerDimension,
+            minWidth: containerDimension,
+            minHeight: containerDimension,
+            maxWidth: containerDimension,
+            maxHeight: containerDimension,
+          },
+        ]}
+      >
         <QRCode
           value={value}
           size={size}
@@ -26,6 +40,12 @@ export const QRCodeDisplay: React.FC<QRCodeDisplayProps> = ({
     </View>
   );
 };
+
+export const QRCodeDisplay = React.memo(
+  QRCodeDisplayComponent,
+  (prevProps, nextProps) =>
+    prevProps.value === nextProps.value && prevProps.size === nextProps.size
+);
 
 const styles = StyleSheet.create({
   wrapper: {
@@ -46,5 +66,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
-  },
+    overflow: 'hidden',
+    ...(Platform.OS === 'web'
+      ? {
+          userSelect: 'none',
+          contain: 'strict',
+          willChange: 'transform',
+        }
+      : {}),
+  } as any,
 });

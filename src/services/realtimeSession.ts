@@ -24,7 +24,7 @@ export function buildAuthoritativeLeaderboard(participants: Participant[]): Lead
     .map((item) => {
       const pScore = typeof item.score === 'number' && !isNaN(item.score) ? item.score : 0;
       const pMax = typeof item.totalMarks === 'number' && item.totalMarks > 0 ? item.totalMarks : 20;
-      const pTime = typeof item.timeTakenSeconds === 'number' && !isNaN(item.timeTakenSeconds) ? Math.max(1, item.timeTakenSeconds) : 1;
+      const pTime = typeof item.timeTakenSeconds === 'number' && !isNaN(item.timeTakenSeconds) && item.timeTakenSeconds > 0 ? Math.round(item.timeTakenSeconds) : 200;
       const pCorrect = typeof item.correctCount === 'number' ? item.correctCount : 0;
       const pTotalQ = typeof item.totalQuestions === 'number' && item.totalQuestions > 0 ? item.totalQuestions : 10;
       const pSubmittedAt = item.submittedAt ? String(item.submittedAt) : new Date().toISOString();

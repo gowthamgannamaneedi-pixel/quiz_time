@@ -299,9 +299,9 @@ function getLeaderboard() {
       return scoreB - scoreA;
     }
 
-    // 2. Secondary: Faster completion time first
-    const timeA = typeof a.timeTakenSeconds === 'number' && !isNaN(a.timeTakenSeconds) ? a.timeTakenSeconds : 0;
-    const timeB = typeof b.timeTakenSeconds === 'number' && !isNaN(b.timeTakenSeconds) ? b.timeTakenSeconds : 0;
+    // 2. Secondary: Faster completion time first (missing/invalid defaults to 200s)
+    const timeA = typeof a.timeTakenSeconds === 'number' && !isNaN(a.timeTakenSeconds) && a.timeTakenSeconds > 0 ? a.timeTakenSeconds : 200;
+    const timeB = typeof b.timeTakenSeconds === 'number' && !isNaN(b.timeTakenSeconds) && b.timeTakenSeconds > 0 ? b.timeTakenSeconds : 200;
     if (timeA !== timeB) {
       return timeA - timeB;
     }
@@ -320,7 +320,7 @@ function getLeaderboard() {
   return allResults.map((item, index) => {
     const scoreVal = typeof item.score === 'number' ? item.score : 0;
     const maxScoreVal = typeof item.maxScore === 'number' && item.maxScore > 0 ? item.maxScore : standardMaxScore;
-    const timeVal = typeof item.timeTakenSeconds === 'number' && item.timeTakenSeconds > 0 ? item.timeTakenSeconds : 1;
+    const timeVal = typeof item.timeTakenSeconds === 'number' && item.timeTakenSeconds > 0 ? Math.round(item.timeTakenSeconds) : 200;
 
     return {
       rank: index + 1,

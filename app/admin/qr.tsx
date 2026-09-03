@@ -49,7 +49,7 @@ export default function AdminQRScreen() {
     }
   }, []);
 
-  const activePin = sessionPin || quiz.pin;
+  const activePin = React.useMemo(() => sessionPin || quiz.pin || '123456', [sessionPin, quiz.pin]);
 
   // Dynamically resolve current computer LAN IPv4
   const detectedLanIp = session.lanIp || realtimeSession.getServerLanIp() || getDetectedLanHost().ip;
@@ -58,9 +58,12 @@ export default function AdminQRScreen() {
   // Universal Join Link encoded in QR & displayed under SCAN TO JOIN:
   // PRODUCTION: https://quiz-time-chi.vercel.app/join/quiz-college-2026?pin=123456
   // LOCAL_LAN:  http://10.x.x.x:8081/join/quiz-college-2026?pin=123456
-  const joinUrl = qrMode === 'LOCAL_LAN'
-    ? `http://${activeIp}:8081/join/${encodeURIComponent(quiz.id)}?pin=${encodeURIComponent(activePin)}`
-    : `https://quiz-time-chi.vercel.app/join/${encodeURIComponent(quiz.id)}?pin=${encodeURIComponent(activePin)}`;
+  const joinUrl = React.useMemo(() => {
+    const qId = quiz?.id || 'quiz_college_2026';
+    return qrMode === 'LOCAL_LAN'
+      ? `http://${activeIp}:8081/join/${encodeURIComponent(qId)}?pin=${encodeURIComponent(activePin)}`
+      : `https://quiz-time-chi.vercel.app/join/${encodeURIComponent(qId)}?pin=${encodeURIComponent(activePin)}`;
+  }, [qrMode, activeIp, activePin, quiz?.id]);
 
   // Auto-fetch fresh LAN IP on mount
   useEffect(() => {
@@ -528,7 +531,9 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   qrWrapper: {
-    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 8,
     backgroundColor: theme.white,
     borderRadius: 16,
     borderWidth: 1,
