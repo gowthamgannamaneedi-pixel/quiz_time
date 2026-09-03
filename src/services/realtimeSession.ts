@@ -7,7 +7,7 @@ type SessionListener = (session: QuizSession) => void;
 
 const SUPABASE_WS_URL = 'wss://domnwcmnvmrzoojbswmz.supabase.co/realtime/v1/websocket?apikey=sb_publishable_eqfFFuZZefKyNwMYFj7hwQ_g6ytJHx6&vsn=1.0.0';
 const SUPABASE_CHANNEL_TOPIC = 'realtime:quiz_college_2026';
-const SESSION_STORAGE_KEY = '@syncquiz_active_session_v9';
+const SESSION_STORAGE_KEY = '@syncquiz_active_session_v10';
 
 function parseAuthoritativeTimestamp(val: any): number {
   if (typeof val === 'number' && !isNaN(val) && val > 0) return val;
@@ -113,6 +113,10 @@ class RealtimeSessionService {
   private loadPersistedSession() {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
+        window.localStorage.removeItem('@syncquiz_active_session_v7');
+        window.localStorage.removeItem('@syncquiz_active_session_v8');
+        window.localStorage.removeItem('@syncquiz_active_session_v9');
+
         const saved = window.localStorage.getItem(SESSION_STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);

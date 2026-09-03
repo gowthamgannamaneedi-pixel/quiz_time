@@ -38,8 +38,28 @@ export default function UniversalQuizJoinScreen() {
   const { quiz } = useAdminQuiz();
   const { pin: officialPin, status: sessionStatus, session, registerStudent } = useRealtimeSession();
 
+  const getDirectUrlPin = (): string => {
+    if (typeof window !== 'undefined' && window.location && window.location.search) {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchPin = urlParams.get('pin');
+        if (searchPin && searchPin.trim().length === 6) {
+          return searchPin.trim();
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return '';
+  };
+
+  const directUrlPin = getDirectUrlPin();
+  const canonicalInitialPin = (directUrlPin && directUrlPin.length === 6)
+    ? directUrlPin
+    : ((initialPin && initialPin.length === 6) ? initialPin : '123456');
+
   const [studentName, setStudentName] = useState(getStoredStudentName() || '');
-  const [enteredPin, setEnteredPin] = useState(initialPin || officialPin || '');
+  const [enteredPin, setEnteredPin] = useState(canonicalInitialPin);
   const [isJoined, setIsJoined] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -50,9 +70,12 @@ export default function UniversalQuizJoinScreen() {
     targetQuizId === quiz.id ||
     targetQuizId === session.quizId;
 
-  // Auto-fill pin if param updates
+  // Auto-fill pin if param or URL updates
   useEffect(() => {
-    if (initialPin) {
+    const freshUrlPin = getDirectUrlPin();
+    if (freshUrlPin && freshUrlPin.length === 6) {
+      setEnteredPin(freshUrlPin);
+    } else if (initialPin && initialPin.length === 6) {
       setEnteredPin(initialPin);
     }
   }, [initialPin]);

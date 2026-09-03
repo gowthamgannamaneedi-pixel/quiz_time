@@ -3,7 +3,7 @@ import { Quiz, Question, QuizStatus, QuizSession, QuizQRPayload } from '../types
 import { realtimeSession } from '../services/realtimeSession';
 import { INITIAL_10_QUESTIONS } from '../data/initialQuestions';
 
-const STORAGE_KEY = '@syncquiz_active_quiz_v7';
+const STORAGE_KEY = '@syncquiz_active_quiz_v8';
 
 export const INITIAL_QUIZ: Quiz = {
   id: 'quiz-college-2026',
@@ -26,6 +26,7 @@ const getSynchronousInitialQuiz = (): Quiz => {
       window.localStorage.removeItem('@syncquiz_active_quiz_v4');
       window.localStorage.removeItem('@syncquiz_active_quiz_v5');
       window.localStorage.removeItem('@syncquiz_active_quiz_v6');
+      window.localStorage.removeItem('@syncquiz_active_quiz_v7');
 
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -33,6 +34,7 @@ const getSynchronousInitialQuiz = (): Quiz => {
         if (parsed && parsed.id && Array.isArray(parsed.questions) && parsed.questions.length === 10) {
           return {
             ...parsed,
+            pin: (parsed.pin && String(parsed.pin).trim().length === 6) ? String(parsed.pin).trim() : '123456',
             category: 'NIAT ADVANCED TECH CLUB',
             durationSeconds: parsed.questions.length * (parsed.defaultQuestionTime || 20),
             status: 'READY',

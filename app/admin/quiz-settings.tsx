@@ -46,9 +46,8 @@ export default function QuizSettingsScreen() {
     setLocalStatus(quiz.status);
   }, [quiz.title, quiz.category, quiz.description, quiz.pin, quiz.status]);
 
-  const generateRandomPin = () => {
-    const random = Math.floor(100000 + Math.random() * 900000).toString();
-    setPin(random);
+  const resetDefaultPin = () => {
+    setPin('123456');
   };
 
   const handleSave = () => {
@@ -156,11 +155,11 @@ export default function QuizSettingsScreen() {
 
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={generateRandomPin}
+              onPress={resetDefaultPin}
               style={styles.generateBtn}
             >
-              <Ionicons name="shuffle" size={18} color={theme.white} />
-              <Text style={styles.generateBtnText}>GENERATE PIN</Text>
+              <Ionicons name="refresh" size={18} color={theme.white} />
+              <Text style={styles.generateBtnText}>RESET TO 123456</Text>
             </TouchableOpacity>
           </View>
         </Card>
