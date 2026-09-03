@@ -73,9 +73,10 @@ export default function AdminDashboardScreen() {
     return () => clearInterval(interval);
   }, [sessionStatus, session.startedAt]);
 
-  // Fetch latest leaderboard on mount
+  // Fetch latest leaderboard on mount and mark as authoritative admin
   useEffect(() => {
     if (isAuthenticated) {
+      realtimeSession.setIsAdmin(true);
       fetchLeaderboard();
     }
   }, [isAuthenticated]);
@@ -97,6 +98,7 @@ export default function AdminDashboardScreen() {
 
     const success = verifyAdminPassword(trimmed);
     if (success) {
+      realtimeSession.setIsAdmin(true);
       setIsAuthenticated(true);
       setPasswordInput('');
       setAuthError(null);
@@ -106,6 +108,7 @@ export default function AdminDashboardScreen() {
   };
 
   const handleAdminLogout = () => {
+    realtimeSession.setIsAdmin(false);
     logoutAdmin();
     setIsAuthenticated(false);
     setPasswordInput('');

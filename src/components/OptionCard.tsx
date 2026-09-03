@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   View,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
@@ -93,7 +94,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 2,
     elevation: 1,
-  },
+    minHeight: 56,
+    ...(Platform.OS === 'web'
+      ? {
+          cursor: 'pointer',
+          userSelect: 'none',
+          touchAction: 'manipulation',
+        }
+      : {}),
+  } as any,
   selectedContainer: {
     backgroundColor: theme.brandBurgundyLight,
     borderColor: theme.brandBurgundy,

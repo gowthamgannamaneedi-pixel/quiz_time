@@ -7,6 +7,7 @@ import {
   ViewStyle,
   TextStyle,
   View,
+  Platform,
 } from 'react-native';
 import { theme } from '../theme/colors';
 
@@ -94,7 +95,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-  },
+    minHeight: 44,
+    ...(Platform.OS === 'web'
+      ? {
+          cursor: 'pointer',
+          userSelect: 'none',
+          touchAction: 'manipulation',
+        }
+      : {}),
+  } as any,
   sizeLg: {
     height: 52,
     paddingHorizontal: 20,

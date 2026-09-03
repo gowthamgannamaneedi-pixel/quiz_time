@@ -190,8 +190,40 @@ class RealtimeSessionService {
     });
   }
 
-  private updateSessionState(newSession: Partial<QuizSession>) {
-    const nextStatus = (newSession.status as QuizStatus) || this.currentSession.status;
+  private isAdmin: boolean = false;
+
+  private getStatusRank(status?: QuizStatus): number {
+    switch (status) {
+      case 'DRAFT': return 0;
+      case 'READY': return 1;
+      case 'WAITING': return 2;
+      case 'LIVE': return 3;
+      case 'ENDED': return 4;
+      default: return 0;
+    }
+  }
+
+  public setIsAdmin(val: boolean) {
+    this.isAdmin = val;
+  }
+
+  private updateSessionState(newSession: Partial<QuizSession>, isExplicitReset: boolean = false) {
+    let nextStatus = (newSession.status as QuizStatus) || this.currentSession.status;
+
+    // Monotonic lifecycle protection:
+    // Once a session enters LIVE or ENDED, an incoming update with lower rank (READY or WAITING)
+    // must NOT downgrade the session unless it is an explicit admin reset.
+    if (!isExplicitReset) {
+      const currentRank = this.getStatusRank(this.currentSession.status);
+      const incomingRank = this.getStatusRank(newSession.status);
+
+      if (currentRank === 3 && incomingRank < 3) {
+        nextStatus = 'LIVE';
+      } else if (currentRank === 4 && incomingRank < 4) {
+        nextStatus = 'ENDED';
+      }
+    }
+
     const nextPin = newSession.pin !== undefined ? newSession.pin : this.currentSession.pin;
     const nextTitle = newSession.title !== undefined ? newSession.title : this.currentSession.title;
     const nextParticipants = newSession.participants !== undefined ? newSession.participants : this.currentSession.participants;
@@ -224,7 +256,9 @@ class RealtimeSessionService {
       category: newSession.category || this.currentSession.category || 'NIAT ADVANCED TECH CLUB',
       description: newSession.description || this.currentSession.description,
       status: nextStatus,
-      startedAt: newSession.startedAt !== undefined ? newSession.startedAt : this.currentSession.startedAt,
+      startedAt: (nextStatus === 'LIVE' && newSession.startedAt)
+        ? newSession.startedAt
+        : (nextStatus === 'LIVE' && this.currentSession.startedAt ? this.currentSession.startedAt : (newSession.startedAt !== undefined ? newSession.startedAt : this.currentSession.startedAt)),
       endedAt: newSession.endedAt !== undefined ? newSession.endedAt : this.currentSession.endedAt,
       durationSeconds: newSession.durationSeconds || this.currentSession.durationSeconds || 200,
       defaultQuestionTime: newSession.defaultQuestionTime || this.currentSession.defaultQuestionTime || 20,
@@ -287,12 +321,15 @@ class RealtimeSessionService {
               if (innerPayload.serverTime) {
                 this.serverClockOffset = innerPayload.serverTime - Date.now();
               }
-              this.updateSessionState(innerPayload.session);
+              this.updateSessionState(innerPayload.session, !!innerPayload.isReset);
             } else if (innerEvent === 'REQUEST_SYNC') {
-              if (this.currentSession.status !== 'DRAFT') {
+              // ONLY Admin or a client currently in LIVE / ENDED should reply to synchronization requests.
+              // Idle or newly opened student clients in READY/WAITING must NEVER broadcast stale READY state!
+              if (this.isAdmin || this.currentSession.status === 'LIVE' || this.currentSession.status === 'ENDED') {
                 this.broadcastEvent('SESSION_UPDATE', {
                   session: this.currentSession,
                   serverTime: Date.now(),
+                  isReset: false,
                 });
               }
             } else if (innerEvent === 'REGISTER_STUDENT' && innerPayload) {
@@ -466,39 +503,46 @@ class RealtimeSessionService {
 
   // --- ADMIN ACTIONS ---
   public adminOpenWaitingRoom() {
+    this.isAdmin = true;
     const updated = {
       ...this.currentSession,
       status: 'WAITING' as QuizStatus,
     };
-    this.updateSessionState(updated);
-    this.broadcastEvent('SESSION_UPDATE', { session: updated, serverTime: Date.now() });
+    this.updateSessionState(updated, true);
+    this.broadcastEvent('SESSION_UPDATE', { session: updated, serverTime: Date.now(), isReset: false });
   }
 
   public adminStartLiveQuiz() {
-    const startedAt = Date.now();
+    this.isAdmin = true;
+    // Idempotency: if already LIVE, preserve the original startedAt to avoid resetting Q1
+    const isAlreadyLive = this.currentSession.status === 'LIVE' && typeof this.currentSession.startedAt === 'number' && this.currentSession.startedAt > 0;
+    const authoritativeStartedAt = isAlreadyLive ? (this.currentSession.startedAt as number) : Date.now();
+
     const updated = {
       ...this.currentSession,
       status: 'LIVE' as QuizStatus,
-      startedAt,
+      startedAt: authoritativeStartedAt,
       endedAt: null,
     };
-    this.updateSessionState(updated);
-    this.broadcastEvent('SESSION_UPDATE', { session: updated, serverTime: startedAt });
+    this.updateSessionState(updated, true);
+    this.broadcastEvent('SESSION_UPDATE', { session: updated, serverTime: authoritativeStartedAt, isReset: false });
   }
 
   public adminEndQuiz() {
+    this.isAdmin = true;
     const endedAt = Date.now();
     const updated = {
       ...this.currentSession,
       status: 'ENDED' as QuizStatus,
       endedAt,
     };
-    this.updateSessionState(updated);
-    this.broadcastEvent('SESSION_UPDATE', { session: updated, serverTime: endedAt });
+    this.updateSessionState(updated, true);
+    this.broadcastEvent('SESSION_UPDATE', { session: updated, serverTime: endedAt, isReset: false });
   }
 
   public adminResetSession() {
-    const updated = {
+    this.isAdmin = true;
+    const updated: QuizSession = {
       ...this.currentSession,
       status: 'READY' as QuizStatus,
       startedAt: null,
@@ -507,8 +551,8 @@ class RealtimeSessionService {
       leaderboard: [],
       connectedStudents: 0,
     };
-    this.updateSessionState(updated);
-    this.broadcastEvent('SESSION_UPDATE', { session: updated, serverTime: Date.now() });
+    this.updateSessionState(updated, true);
+    this.broadcastEvent('SESSION_UPDATE', { session: updated, serverTime: Date.now(), isReset: true });
   }
 
   public adminUpdateSettings(settings: {

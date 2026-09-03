@@ -95,16 +95,19 @@ const styles = StyleSheet.create({
   },
   hiddenInput: {
     position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     opacity: 0.01,
-    width: 1,
-    height: 1,
+    zIndex: 10,
   },
   boxesRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     maxWidth: 340,
-    gap: 8,
+    gap: 6,
   },
   digitBox: {
     flex: 1,
