@@ -21,7 +21,7 @@ export const useRealtimeSession = () => {
     startedAt: session.startedAt,
     endedAt: session.endedAt,
     durationSeconds: session.durationSeconds,
-    connectedStudents: session.connectedStudents || 0,
+    connectedStudents: (session.participants && session.participants.length > 0) ? session.participants.length : (session.connectedStudents || 0),
     participants: session.participants || [],
     leaderboard: session.leaderboard || [],
     isWaiting: session.status === 'WAITING',

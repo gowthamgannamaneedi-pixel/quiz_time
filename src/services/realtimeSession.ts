@@ -117,9 +117,13 @@ class RealtimeSessionService {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed && parsed.sessionId) {
+            const parsedParticipants = Array.isArray(parsed.participants) ? parsed.participants : [];
             this.currentSession = {
               ...this.currentSession,
               ...parsed,
+              pin: (parsed.pin && String(parsed.pin).trim().length === 6) ? String(parsed.pin).trim() : '123456',
+              participants: parsedParticipants,
+              connectedStudents: parsedParticipants.length > 0 ? parsedParticipants.length : (parsed.connectedStudents || 0),
               questions: (parsed.questions && parsed.questions.length === 10) ? parsed.questions : INITIAL_10_QUESTIONS,
             };
           }
@@ -224,16 +228,18 @@ class RealtimeSessionService {
       }
     }
 
-    const nextPin = newSession.pin !== undefined ? newSession.pin : this.currentSession.pin;
+    const nextPin = (newSession.pin !== undefined && String(newSession.pin).trim().length === 6)
+      ? String(newSession.pin).trim()
+      : (this.currentSession.pin || '123456');
     const nextTitle = newSession.title !== undefined ? newSession.title : this.currentSession.title;
     const nextParticipants = newSession.participants !== undefined ? newSession.participants : this.currentSession.participants;
     const nextLeaderboard = nextParticipants && nextParticipants.length > 0
       ? buildAuthoritativeLeaderboard(nextParticipants)
       : (newSession.leaderboard !== undefined ? newSession.leaderboard : this.currentSession.leaderboard);
     const nextQuestions = (newSession.questions && newSession.questions.length > 0) ? newSession.questions : this.currentSession.questions;
-    const nextConnected = newSession.connectedStudents !== undefined
-      ? newSession.connectedStudents
-      : (nextParticipants ? nextParticipants.length : this.currentSession.connectedStudents);
+    const nextConnected = nextParticipants
+      ? nextParticipants.length
+      : (newSession.connectedStudents !== undefined ? newSession.connectedStudents : this.currentSession.connectedStudents);
 
     if (newSession.lanIp) {
       setDynamicServerLanIp(newSession.lanIp);

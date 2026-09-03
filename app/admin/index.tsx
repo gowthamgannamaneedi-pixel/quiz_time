@@ -122,8 +122,10 @@ export default function AdminDashboardScreen() {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const completedCount = participants.filter((p) => p.status === 'SUBMITTED').length;
+  const totalJoinedCount = (participants && participants.length > 0) ? participants.length : (connectedStudents || 0);
+  const waitingCount = participants.filter((p) => p.status === 'WAITING' || !p.status).length;
   const liveCount = participants.filter((p) => p.status === 'LIVE').length;
+  const completedCount = participants.filter((p) => p.status === 'SUBMITTED').length;
 
   const handleOpenWaitingRoom = () => {
     openWaitingRoom();
@@ -158,12 +160,19 @@ export default function AdminDashboardScreen() {
           bg: theme.brandGoldSurface,
           text: theme.brandGoldText,
           border: theme.brandGoldBorder,
-          label: connectedStudents > 0
-            ? `STUDENTS CONNECTED: ${connectedStudents}`
+          label: totalJoinedCount > 0
+            ? `STUDENTS CONNECTED: ${totalJoinedCount}`
             : 'WAITING FOR STUDENTS',
         };
       case 'READY':
-        return { bg: theme.brandSurfaceLight, text: theme.brandText, border: theme.brandBorder, label: 'READY' };
+        return {
+          bg: theme.brandSurfaceLight,
+          text: theme.brandText,
+          border: theme.brandBorder,
+          label: totalJoinedCount > 0
+            ? `READY (${totalJoinedCount} JOINED)`
+            : 'READY',
+        };
       case 'ENDED':
         return { bg: theme.dangerSurface, text: theme.dangerText, border: theme.dangerBorder, label: 'ENDED' };
       default:
@@ -421,14 +430,14 @@ export default function AdminDashboardScreen() {
             <View style={styles.participantsBadge}>
               <Ionicons name="people" size={16} color={theme.brandBurgundy} />
               <Text style={styles.participantsBadgeText}>
-                {connectedStudents} Connected
+                {totalJoinedCount} Connected
               </Text>
             </View>
           </View>
 
           <View style={styles.sessionStatsGrid}>
             <View style={styles.sessionStatItem}>
-              <Text style={styles.sessionStatNum}>{connectedStudents}</Text>
+              <Text style={styles.sessionStatNum}>{totalJoinedCount}</Text>
               <Text style={styles.sessionStatLabel}>JOINED</Text>
             </View>
             <View style={styles.sessionStatItem}>
