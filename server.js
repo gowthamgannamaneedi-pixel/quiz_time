@@ -299,21 +299,14 @@ function getLeaderboard() {
       return scoreB - scoreA;
     }
 
-    // 2. Secondary: Faster completion time first (missing/invalid defaults to 200s)
-    const timeA = typeof a.timeTakenSeconds === 'number' && !isNaN(a.timeTakenSeconds) && a.timeTakenSeconds > 0 ? a.timeTakenSeconds : 200;
-    const timeB = typeof b.timeTakenSeconds === 'number' && !isNaN(b.timeTakenSeconds) && b.timeTakenSeconds > 0 ? b.timeTakenSeconds : 200;
-    if (timeA !== timeB) {
-      return timeA - timeB;
-    }
-
-    // 3. Final tie-breaker: Earlier authoritative submission timestamp first
+    // 2. Secondary: Earlier authoritative submission timestamp first
     const dateA = parseAuthoritativeTimestamp(a.submittedAt);
     const dateB = parseAuthoritativeTimestamp(b.submittedAt);
     if (dateA !== dateB) {
       return dateA - dateB;
     }
 
-    // 4. Deterministic unique ordering fallback
+    // 3. Final tie-breaker: Deterministic unique ordering fallback
     return String(a.participantId || '').localeCompare(String(b.participantId || ''));
   });
 

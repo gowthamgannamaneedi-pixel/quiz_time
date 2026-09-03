@@ -48,19 +48,14 @@ export function buildAuthoritativeLeaderboard(participants: Participant[]): Lead
         return b.score - a.score;
       }
 
-      // 2. Secondary: Faster completion time first
-      if (a.timeTakenSeconds !== b.timeTakenSeconds) {
-        return a.timeTakenSeconds - b.timeTakenSeconds;
-      }
-
-      // 3. Final tie-breaker: Earlier authoritative submission timestamp first
+      // 2. Secondary: Earlier authoritative submission timestamp first
       const timeA = parseAuthoritativeTimestamp(a.submittedAt);
       const timeB = parseAuthoritativeTimestamp(b.submittedAt);
       if (timeA !== timeB) {
         return timeA - timeB;
       }
 
-      // 4. Deterministic unique ordering fallback
+      // 3. Final tie-breaker: Deterministic unique participantId ascending fallback
       return String(a.participantId || '').localeCompare(String(b.participantId || ''));
     })
     .map((entry, idx) => ({
