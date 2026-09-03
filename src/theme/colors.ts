@@ -1,5 +1,5 @@
 /**
- * Official NIAT Advance Tech Club - Premium Light Theme Palette
+ * Official NIAT Advanced Tech Club - Premium Light Theme Palette
  * 80% White / Light Neutral, 15% Dark High-Contrast Typography, 5% Deep Burgundy & Red Brand Accents
  */
 export const theme = {

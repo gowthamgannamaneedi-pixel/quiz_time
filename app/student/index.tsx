@@ -27,6 +27,7 @@ import {
   createFreshParticipantId,
   validateStudentName,
 } from '../../src/utils/studentSession';
+import { unlockAudio } from '../../src/utils/soundEffects';
 
 export default function StudentHomeScreen() {
   const router = useRouter();
@@ -44,6 +45,7 @@ export default function StudentHomeScreen() {
   }, []);
 
   const handleJoinByPin = async (pinToValidate?: string) => {
+    unlockAudio();
     setErrorMsg(null);
 
     // 1. Validate Student Name
@@ -78,6 +80,7 @@ export default function StudentHomeScreen() {
   };
 
   const handleOpenScanner = () => {
+    unlockAudio();
     setErrorMsg(null);
     const nameVal = validateStudentName(studentName);
     if (!nameVal.isValid) {

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,33 +15,57 @@ import { Header } from '../../src/components/Header';
 import { Card } from '../../src/components/Card';
 import { Button } from '../../src/components/Button';
 import { BrandLogo } from '../../src/components/BrandLogo';
+import { CountdownOverlay } from '../../src/components/CountdownOverlay';
+import { realtimeSession } from '../../src/services/realtimeSession';
 import { theme } from '../../src/theme/colors';
 import { getStoredStudentName, getOrCreateParticipantId } from '../../src/utils/studentSession';
+import { unlockAudio } from '../../src/utils/soundEffects';
 
 export default function StudentReadyScreen() {
   const router = useRouter();
   const { quiz } = useAdminQuiz();
   const { status: sessionStatus, session, registerStudent } = useRealtimeSession();
 
+  const [readyCountdownTicks, setReadyCountdownTicks] = useState<number>(0);
+
   // Active authoritative questions
   const activeQuestions = (session.questions && session.questions.length > 0) ? session.questions : quiz.questions;
   const totalQuestions = activeQuestions.length;
   const totalMarks = activeQuestions.reduce((acc, q) => acc + q.marks, 0);
 
-  // Register this student device with the real-time server on mount
+  // Register this student device with the real-time server on mount & unlock audio
   useEffect(() => {
+    unlockAudio();
     const studentName = getStoredStudentName() || 'Student';
     const participantId = getOrCreateParticipantId();
     registerStudent(studentName, participantId);
   }, []);
 
-  // AUTOMATIC TRANSITION: The moment Admin triggers START QUIZ (status becomes 'LIVE'),
-  // all connected student screens automatically navigate to the live examination screen.
+  // Synchronized countdown from Waiting Room to Question 1
   useEffect(() => {
-    if (sessionStatus === 'LIVE') {
-      router.replace('/student/quiz');
+    if (sessionStatus !== 'LIVE' || !session.startedAt) {
+      setReadyCountdownTicks(0);
+      return;
     }
-  }, [sessionStatus]);
+
+    const checkCountdown = () => {
+      const now = realtimeSession.getAuthoritativeServerTime();
+      const elapsed = Math.max(0, now - (session.startedAt || 0));
+      const remainingMs = 3000 - elapsed;
+
+      if (remainingMs > 0) {
+        const tick = Math.min(3, Math.max(1, Math.ceil(remainingMs / 1000)));
+        setReadyCountdownTicks(tick);
+      } else {
+        setReadyCountdownTicks(0);
+        router.replace('/student/quiz');
+      }
+    };
+
+    checkCountdown();
+    const interval = setInterval(checkCountdown, 150);
+    return () => clearInterval(interval);
+  }, [sessionStatus, session.startedAt]);
 
   const formatDuration = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
@@ -49,6 +73,17 @@ export default function StudentReadyScreen() {
     if (secs === 0) return `${mins}`;
     return `${mins}m ${secs}s`;
   };
+
+  if (sessionStatus === 'LIVE' && readyCountdownTicks > 0) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <CountdownOverlay
+          secondsRemaining={readyCountdownTicks}
+          quizTitle={session.title || quiz.title}
+        />
+      </SafeAreaView>
+    );
+  }
 
   if (sessionStatus === 'ENDED') {
     return (
@@ -89,7 +124,7 @@ export default function StudentReadyScreen() {
         <Card style={styles.waitingHeroCard}>
           <View style={styles.brandHeroBox}>
             <BrandLogo size="md" />
-            <Text style={styles.clubBrandText}>NIAT ADVANCE TECH CLUB</Text>
+            <Text style={styles.clubBrandText}>NIAT ADVANCED TECH CLUB</Text>
           </View>
 
           <View style={styles.joinedBadgeRow}>
@@ -127,7 +162,7 @@ export default function StudentReadyScreen() {
               <Text style={styles.pinBadgeText}>PIN: {session.pin || quiz.pin}</Text>
             </View>
             <View style={styles.categoryBadge}>
-              <Text style={styles.categoryBadgeText}>{session.category || quiz.category || 'NIAT ADVANCE TECH CLUB'}</Text>
+              <Text style={styles.categoryBadgeText}>{session.category || quiz.category || 'NIAT ADVANCED TECH CLUB'}</Text>
             </View>
           </View>
 

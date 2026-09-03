@@ -3,6 +3,7 @@ import { Quiz, QuizResult } from '../types/quiz.types';
 import { realtimeSession } from '../services/realtimeSession';
 import { getStoredStudentName, getOrCreateParticipantId } from '../utils/studentSession';
 
+export const PRE_QUIZ_COUNTDOWN_MS = 3000;
 export const QUESTION_DURATION_SECS = 20;
 
 export const useQuizSession = (quiz: Quiz | null) => {
@@ -14,6 +15,7 @@ export const useQuizSession = (quiz: Quiz | null) => {
 
   const totalQuestions = quiz?.questions.length || 1;
   const [questionTimeLeft, setQuestionTimeLeft] = useState<number>(QUESTION_DURATION_SECS);
+  const [countdownSecondsLeft, setCountdownSecondsLeft] = useState<number>(0);
 
   const timerRef = useRef<any>(null);
   const answersRef = useRef(answers);
@@ -41,6 +43,7 @@ export const useQuizSession = (quiz: Quiz | null) => {
         setResult(null);
         lastAnsweredAtRef.current = 0;
         setQuestionTimeLeft(QUESTION_DURATION_SECS);
+        setCountdownSecondsLeft(0);
       }
     }
   }, [quiz?.id, quiz?.status]);
@@ -60,14 +63,15 @@ export const useQuizSession = (quiz: Quiz | null) => {
 
     const currentAnswers = answersRef.current;
     const sessionStartedAt = realtimeSession.getSession().startedAt || currentQ.startedAt || (Date.now() - 20000);
+    const questionsStartedAt = sessionStartedAt + PRE_QUIZ_COUNTDOWN_MS;
     
     // Real completion time calculation:
-    // Uses the exact timestamp when student locked their last answer (or completed)!
+    // Uses the exact timestamp when student locked their last answer (or completed) relative to Question 1 start!
     const lastAnswerTime = lastAnsweredAtRef.current > 0
       ? lastAnsweredAtRef.current
       : (realtimeSession.getAuthoritativeServerTime());
 
-    const timeTaken = Math.max(1, Math.round((lastAnswerTime - sessionStartedAt) / 1000));
+    const timeTaken = Math.max(1, Math.round((lastAnswerTime - questionsStartedAt) / 1000));
 
     let correctCount = 0;
     let wrongCount = 0;
@@ -109,7 +113,7 @@ export const useQuizSession = (quiz: Quiz | null) => {
     console.log('correctAnswers:', correctCount);
     console.log('wrongAnswers:', wrongCount);
     console.log('unanswered:', unansweredCount);
-    console.log('attemptStartedAt:', new Date(sessionStartedAt).toISOString());
+    console.log('attemptStartedAt:', new Date(questionsStartedAt).toISOString());
     console.log('completedAt:', new Date(lastAnswerTime).toISOString());
     console.log('totalTimeTaken:', `${timeTaken}s (${Math.floor(timeTaken / 60)}m ${timeTaken % 60}s)`);
     console.log('====================================================');
@@ -145,19 +149,38 @@ export const useQuizSession = (quiz: Quiz | null) => {
 
     if (quiz.status !== 'LIVE' || !quiz.startedAt) {
       setQuestionTimeLeft(QUESTION_DURATION_SECS);
+      setCountdownSecondsLeft(0);
       return;
     }
 
-    // Function to compute exact question and remaining seconds from authoritative server time
+    // Function to compute exact countdown or question remaining seconds from authoritative server time
     const updateAuthoritativeTimer = () => {
       const sessionStarted = realtimeSession.getSession().startedAt || quiz.startedAt;
       if (!sessionStarted || typeof sessionStarted !== 'number' || sessionStarted < 1000000000000) {
         setQuestionTimeLeft(QUESTION_DURATION_SECS);
+        setCountdownSecondsLeft(0);
         return;
       }
 
       const now = realtimeSession.getAuthoritativeServerTime();
-      const elapsedMs = Math.max(0, now - sessionStarted);
+      const elapsedMsSinceAdminStart = Math.max(0, now - sessionStarted);
+      const countdownRemainingMs = PRE_QUIZ_COUNTDOWN_MS - elapsedMsSinceAdminStart;
+
+      // 1. Check if we are still within the 3-second pre-quiz countdown
+      if (countdownRemainingMs > 0) {
+        const remainingTicks = Math.min(3, Math.max(1, Math.ceil(countdownRemainingMs / 1000)));
+        setCountdownSecondsLeft(remainingTicks);
+        setCurrentIndex(0);
+        const firstQSecs = quiz.questions[0]?.timeLimit || quiz.defaultQuestionTime || QUESTION_DURATION_SECS;
+        setQuestionTimeLeft(firstQSecs);
+        return;
+      }
+
+      // 2. Countdown has finished; now we are in the live question stream!
+      setCountdownSecondsLeft(0);
+
+      const quizQuestionsStartedAt = sessionStarted + PRE_QUIZ_COUNTDOWN_MS;
+      const elapsedMsSinceQuestionsStart = Math.max(0, now - quizQuestionsStartedAt);
       const totalQ = quiz.questions.length;
 
       if (totalQ === 0) return;
@@ -166,16 +189,16 @@ export const useQuizSession = (quiz: Quiz | null) => {
       let cumulativeMs = 0;
       let activeIndex = 0;
       const firstQSecs = quiz.questions[0]?.timeLimit || quiz.defaultQuestionTime || QUESTION_DURATION_SECS;
-      let activeQuestionExpiresAt = sessionStarted + firstQSecs * 1000;
+      let activeQuestionExpiresAt = quizQuestionsStartedAt + firstQSecs * 1000;
 
       for (let i = 0; i < totalQ; i++) {
         const qSecs = quiz.questions[i]?.timeLimit || quiz.defaultQuestionTime || QUESTION_DURATION_SECS;
         const qMs = qSecs * 1000;
         const qEndMs = cumulativeMs + qMs;
 
-        if (elapsedMs < qEndMs) {
+        if (elapsedMsSinceQuestionsStart < qEndMs) {
           activeIndex = i;
-          activeQuestionExpiresAt = sessionStarted + qEndMs;
+          activeQuestionExpiresAt = quizQuestionsStartedAt + qEndMs;
           cumulativeMs = qEndMs;
           break;
         }
@@ -186,7 +209,7 @@ export const useQuizSession = (quiz: Quiz | null) => {
       }
 
       // ONLY finalize if elapsed time has genuinely exceeded the entire quiz duration
-      if (elapsedMs >= cumulativeMs && cumulativeMs > 0) {
+      if (elapsedMsSinceQuestionsStart >= cumulativeMs && cumulativeMs > 0) {
         if (timerRef.current) {
           clearInterval(timerRef.current);
           timerRef.current = null;
@@ -210,7 +233,7 @@ export const useQuizSession = (quiz: Quiz | null) => {
       clearInterval(timerRef.current);
     }
 
-    timerRef.current = setInterval(updateAuthoritativeTimer, 400);
+    timerRef.current = setInterval(updateAuthoritativeTimer, 250);
 
     return () => {
       if (timerRef.current) {
@@ -274,6 +297,7 @@ export const useQuizSession = (quiz: Quiz | null) => {
     answers,
     markedForReview,
     timeLeft: questionTimeLeft,
+    countdownSecondsLeft,
     perQuestionDuration: QUESTION_DURATION_SECS,
     isSubmitted,
     result,

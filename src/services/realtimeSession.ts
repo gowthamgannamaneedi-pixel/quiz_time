@@ -9,6 +9,66 @@ const SUPABASE_WS_URL = 'wss://domnwcmnvmrzoojbswmz.supabase.co/realtime/v1/webs
 const SUPABASE_CHANNEL_TOPIC = 'realtime:quiz_college_2026';
 const SESSION_STORAGE_KEY = '@syncquiz_active_session_v9';
 
+function parseAuthoritativeTimestamp(val: any): number {
+  if (typeof val === 'number' && !isNaN(val) && val > 0) return val;
+  if (typeof val === 'string' && val.trim()) {
+    const parsed = new Date(val).getTime();
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
+}
+
+export function buildAuthoritativeLeaderboard(participants: Participant[]): LeaderboardEntry[] {
+  return (participants || [])
+    .filter((item) => item.status === 'SUBMITTED')
+    .map((item) => {
+      const pScore = typeof item.score === 'number' && !isNaN(item.score) ? item.score : 0;
+      const pMax = typeof item.totalMarks === 'number' && item.totalMarks > 0 ? item.totalMarks : 20;
+      const pTime = typeof item.timeTakenSeconds === 'number' && !isNaN(item.timeTakenSeconds) ? Math.max(1, item.timeTakenSeconds) : 1;
+      const pCorrect = typeof item.correctCount === 'number' ? item.correctCount : 0;
+      const pTotalQ = typeof item.totalQuestions === 'number' && item.totalQuestions > 0 ? item.totalQuestions : 10;
+      const pSubmittedAt = item.submittedAt ? String(item.submittedAt) : new Date().toISOString();
+
+      return {
+        rank: 1,
+        participantId: item.participantId,
+        studentName: item.name || 'Student',
+        score: pScore,
+        maxScore: pMax,
+        percentage: pMax > 0 ? Math.round((pScore / pMax) * 100) : 0,
+        correctCount: pCorrect,
+        totalQuestions: pTotalQ,
+        timeTakenSeconds: pTime,
+        submittedAt: pSubmittedAt,
+      };
+    })
+    .sort((a, b) => {
+      // 1. Primary: Higher score first
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+
+      // 2. Secondary: Faster completion time first
+      if (a.timeTakenSeconds !== b.timeTakenSeconds) {
+        return a.timeTakenSeconds - b.timeTakenSeconds;
+      }
+
+      // 3. Final tie-breaker: Earlier authoritative submission timestamp first
+      const timeA = parseAuthoritativeTimestamp(a.submittedAt);
+      const timeB = parseAuthoritativeTimestamp(b.submittedAt);
+      if (timeA !== timeB) {
+        return timeA - timeB;
+      }
+
+      // 4. Deterministic unique ordering fallback
+      return String(a.participantId || '').localeCompare(String(b.participantId || ''));
+    })
+    .map((entry, idx) => ({
+      ...entry,
+      rank: idx + 1,
+    }));
+}
+
 class RealtimeSessionService {
   private ws: any = null;
   private listeners: Set<SessionListener> = new Set();
@@ -26,7 +86,7 @@ class RealtimeSessionService {
     quizId: 'quiz-college-2026',
     pin: '123456',
     title: 'College Quiz 2026',
-    category: 'NIAT ADVANCE TECH CLUB',
+    category: 'NIAT ADVANCED TECH CLUB',
     description: 'Official Code in Air & Hand Gesture Technology Championship 2026.',
     status: 'READY',
     startedAt: null,
@@ -135,7 +195,9 @@ class RealtimeSessionService {
     const nextPin = newSession.pin !== undefined ? newSession.pin : this.currentSession.pin;
     const nextTitle = newSession.title !== undefined ? newSession.title : this.currentSession.title;
     const nextParticipants = newSession.participants !== undefined ? newSession.participants : this.currentSession.participants;
-    const nextLeaderboard = newSession.leaderboard !== undefined ? newSession.leaderboard : this.currentSession.leaderboard;
+    const nextLeaderboard = nextParticipants && nextParticipants.length > 0
+      ? buildAuthoritativeLeaderboard(nextParticipants)
+      : (newSession.leaderboard !== undefined ? newSession.leaderboard : this.currentSession.leaderboard);
     const nextQuestions = (newSession.questions && newSession.questions.length > 0) ? newSession.questions : this.currentSession.questions;
     const nextConnected = newSession.connectedStudents !== undefined
       ? newSession.connectedStudents
@@ -159,7 +221,7 @@ class RealtimeSessionService {
       quizId: newSession.quizId || this.currentSession.quizId,
       pin: nextPin,
       title: nextTitle,
-      category: newSession.category || this.currentSession.category || 'NIAT ADVANCE TECH CLUB',
+      category: newSession.category || this.currentSession.category || 'NIAT ADVANCED TECH CLUB',
       description: newSession.description || this.currentSession.description,
       status: nextStatus,
       startedAt: newSession.startedAt !== undefined ? newSession.startedAt : this.currentSession.startedAt,
@@ -393,31 +455,8 @@ class RealtimeSessionService {
       });
     }
 
-    // Update & sort Leaderboard:
-    // 1. Higher score first
-    // 2. Faster completion time breaks ties
-    const leaderboard: LeaderboardEntry[] = participants
-      .filter((item) => item.status === 'SUBMITTED')
-      .map((item) => ({
-        rank: 1,
-        participantId: item.participantId,
-        studentName: item.name,
-        score: item.score || 0,
-        maxScore: item.totalMarks || 20,
-        percentage: item.totalMarks ? Math.round(((item.score || 0) / item.totalMarks) * 100) : 0,
-        correctCount: item.correctCount || 0,
-        totalQuestions: item.totalQuestions || 10,
-        timeTakenSeconds: item.timeTakenSeconds || 0,
-        submittedAt: String(item.submittedAt || new Date().toISOString()),
-      }))
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return a.timeTakenSeconds - b.timeTakenSeconds;
-      })
-      .map((entry, idx) => ({
-        ...entry,
-        rank: idx + 1,
-      }));
+    // Update & sort Leaderboard with Authoritative Deterministic Tie-Breaking
+    const leaderboard = buildAuthoritativeLeaderboard(participants);
 
     this.updateSessionState({
       participants,
@@ -507,7 +546,7 @@ class RealtimeSessionService {
   }
 
   public async fetchLeaderboard(): Promise<LeaderboardEntry[]> {
-    return this.currentSession.leaderboard || [];
+    return buildAuthoritativeLeaderboard(this.currentSession.participants || []);
   }
 
   public async fetchSessionDirectly(): Promise<QuizSession> {

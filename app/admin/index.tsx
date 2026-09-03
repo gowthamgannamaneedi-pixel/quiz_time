@@ -19,6 +19,7 @@ import { Card } from '../../src/components/Card';
 import { Button } from '../../src/components/Button';
 import { BrandLogo } from '../../src/components/BrandLogo';
 import { theme } from '../../src/theme/colors';
+import { realtimeSession } from '../../src/services/realtimeSession';
 import { isAdminAuthenticated, verifyAdminPassword, logoutAdmin } from '../../src/utils/adminAuth';
 
 export default function AdminDashboardScreen() {
@@ -26,6 +27,7 @@ export default function AdminDashboardScreen() {
   const { quiz } = useAdminQuiz();
   const {
     pin: sessionPin,
+    session,
     status: sessionStatus,
     connectedStudents,
     participants,
@@ -45,7 +47,31 @@ export default function AdminDashboardScreen() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const [showEndQuizModal, setShowEndQuizModal] = useState(false);
+  const [adminCountdownTicks, setAdminCountdownTicks] = useState<number>(0);
   const displayPin = sessionPin || quiz.pin;
+
+  // Track 3-second pre-quiz countdown synchronously on Admin screen
+  useEffect(() => {
+    if (sessionStatus !== 'LIVE' || !session.startedAt) {
+      setAdminCountdownTicks(0);
+      return;
+    }
+
+    const checkAdminCountdown = () => {
+      const now = realtimeSession.getAuthoritativeServerTime();
+      const elapsed = now - (session.startedAt || 0);
+      const remainingMs = 3000 - elapsed;
+      if (remainingMs > 0) {
+        setAdminCountdownTicks(Math.min(3, Math.max(1, Math.ceil(remainingMs / 1000))));
+      } else {
+        setAdminCountdownTicks(0);
+      }
+    };
+
+    checkAdminCountdown();
+    const interval = setInterval(checkAdminCountdown, 250);
+    return () => clearInterval(interval);
+  }, [sessionStatus, session.startedAt]);
 
   // Fetch latest leaderboard on mount
   useEffect(() => {
@@ -120,6 +146,9 @@ export default function AdminDashboardScreen() {
   const getStatusBadgeStyle = () => {
     switch (sessionStatus) {
       case 'LIVE':
+        if (adminCountdownTicks > 0) {
+          return { bg: theme.brandGoldSurface, text: theme.brandGoldText, border: theme.brandGoldBorder, label: `COUNTDOWN: ${adminCountdownTicks}s` };
+        }
         return { bg: theme.successSurface, text: theme.successText, border: theme.successBorder, label: 'LIVE' };
       case 'WAITING':
         return {
@@ -233,7 +262,7 @@ export default function AdminDashboardScreen() {
         <Card style={styles.dashboardHeroCard}>
           <View style={styles.brandHeroBanner}>
             <BrandLogo size="md" />
-            <Text style={styles.clubBrandText}>NIAT ADVANCE TECH CLUB</Text>
+            <Text style={styles.clubBrandText}>NIAT ADVANCED TECH CLUB</Text>
             
             <TouchableOpacity
               activeOpacity={0.7}
@@ -448,9 +477,11 @@ export default function AdminDashboardScreen() {
             {sessionStatus === 'LIVE' && (
               <>
                 <View style={styles.liveQuizRunningBanner}>
-                  <Ionicons name="radio" size={20} color={theme.success} />
+                  <Ionicons name={adminCountdownTicks > 0 ? "hourglass-outline" : "radio"} size={20} color={adminCountdownTicks > 0 ? theme.brandGold : theme.success} />
                   <Text style={styles.liveQuizRunningText}>
-                    Quiz is currently LIVE. Questions auto-advance every 20s.
+                    {adminCountdownTicks > 0
+                      ? `Pre-Quiz 3-Second Countdown in progress (${adminCountdownTicks}s)... Students will see Question 1 automatically.`
+                      : 'Quiz is currently LIVE. Questions auto-advance every 20s.'}
                   </Text>
                 </View>
 

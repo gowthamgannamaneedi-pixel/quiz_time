@@ -20,6 +20,7 @@ import { Card } from '../../src/components/Card';
 import { Button } from '../../src/components/Button';
 import { BrandLogo } from '../../src/components/BrandLogo';
 import { theme } from '../../src/theme/colors';
+import { CountdownOverlay } from '../../src/components/CountdownOverlay';
 import { getOrCreateParticipantId, getStoredStudentName } from '../../src/utils/studentSession';
 
 export default function StudentQuizScreen() {
@@ -39,7 +40,7 @@ export default function StudentQuizScreen() {
   const activeQuiz = {
     ...quiz,
     questions: activeQuestions,
-    category: session.category || quiz.category || 'NIAT ADVANCE TECH CLUB',
+    category: session.category || quiz.category || 'NIAT ADVANCED TECH CLUB',
     status: session.status,
     startedAt: session.startedAt,
     endedAt: session.endedAt,
@@ -53,6 +54,7 @@ export default function StudentQuizScreen() {
     answers,
     markedForReview,
     timeLeft,
+    countdownSecondsLeft,
     isSubmitted,
     result,
     answeredCount,
@@ -75,13 +77,9 @@ export default function StudentQuizScreen() {
     }
   }, [session.status, isSubmitted, submitQuiz]);
 
-  // When submitted, notify server and navigate to Result screen
+  // When submitted, navigate to Result screen
   useEffect(() => {
     if (isSubmitted && result) {
-      const pid = getOrCreateParticipantId();
-      const sName = getStoredStudentName() || 'Student';
-      realtimeSession.submitStudentResult(pid, result, sName);
-
       router.replace({
         pathname: '/student/result',
         params: {
@@ -126,6 +124,14 @@ export default function StudentQuizScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* 3-Second Pre-Quiz Countdown Overlay */}
+      {countdownSecondsLeft > 0 && (
+        <CountdownOverlay
+          secondsRemaining={countdownSecondsLeft}
+          quizTitle={session.title || quiz.title}
+        />
+      )}
+
       {/* Top Examination Bar: [NIAT LOGO]    ⏱ 00:20    1/10 */}
       <View style={styles.topBar}>
         <View style={styles.topBarBrandCol}>

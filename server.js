@@ -206,7 +206,7 @@ let activeSession = {
   quizId: 'quiz-college-2026',
   pin: '123456',
   title: 'College Quiz 2026',
-  category: 'NIAT ADVANCE TECH CLUB',
+  category: 'NIAT ADVANCED TECH CLUB',
   description: 'Official Code in Air & Hand Gesture Technology Championship 2026.',
   status: 'READY', // 'DRAFT' | 'READY' | 'WAITING' | 'LIVE' | 'ENDED'
   startedAt: null,
@@ -277,27 +277,44 @@ function calculateScoreForStudent(pId, incomingAnswers) {
   };
 }
 
+function parseAuthoritativeTimestamp(val) {
+  if (typeof val === 'number' && !isNaN(val) && val > 0) return val;
+  if (typeof val === 'string' && val.trim()) {
+    const parsed = new Date(val).getTime();
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
+}
+
 function getLeaderboard() {
   const allResults = Array.from(resultsMap.values());
   const currentQuestions = activeSession.questions || DEFAULT_QUESTIONS;
   const standardMaxScore = currentQuestions.reduce((acc, q) => acc + (q.marks || 2), 0);
 
   allResults.sort((a, b) => {
-    const scoreA = typeof a.score === 'number' ? a.score : 0;
-    const scoreB = typeof b.score === 'number' ? b.score : 0;
+    // 1. Primary: Higher score first
+    const scoreA = typeof a.score === 'number' && !isNaN(a.score) ? a.score : 0;
+    const scoreB = typeof b.score === 'number' && !isNaN(b.score) ? b.score : 0;
     if (scoreB !== scoreA) {
       return scoreB - scoreA;
     }
 
-    const timeA = typeof a.timeTakenSeconds === 'number' ? a.timeTakenSeconds : 0;
-    const timeB = typeof b.timeTakenSeconds === 'number' ? b.timeTakenSeconds : 0;
+    // 2. Secondary: Faster completion time first
+    const timeA = typeof a.timeTakenSeconds === 'number' && !isNaN(a.timeTakenSeconds) ? a.timeTakenSeconds : 0;
+    const timeB = typeof b.timeTakenSeconds === 'number' && !isNaN(b.timeTakenSeconds) ? b.timeTakenSeconds : 0;
     if (timeA !== timeB) {
       return timeA - timeB;
     }
 
-    const dateA = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
-    const dateB = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
-    return dateA - dateB;
+    // 3. Final tie-breaker: Earlier authoritative submission timestamp first
+    const dateA = parseAuthoritativeTimestamp(a.submittedAt);
+    const dateB = parseAuthoritativeTimestamp(b.submittedAt);
+    if (dateA !== dateB) {
+      return dateA - dateB;
+    }
+
+    // 4. Deterministic unique ordering fallback
+    return String(a.participantId || '').localeCompare(String(b.participantId || ''));
   });
 
   return allResults.map((item, index) => {

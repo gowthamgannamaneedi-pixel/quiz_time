@@ -47,7 +47,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       />
       {showText && (
         <View style={styles.textContainer}>
-          <Text style={styles.brandTitle}>NIAT ADVANCE TECH CLUB</Text>
+          <Text style={styles.brandTitle}>NIAT ADVANCED TECH CLUB</Text>
           {subtitle ? <Text style={styles.brandSubtitle}>{subtitle}</Text> : null}
         </View>
       )}

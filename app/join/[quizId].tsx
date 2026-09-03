@@ -27,6 +27,7 @@ import {
   createFreshParticipantId,
   validateStudentName,
 } from '../../src/utils/studentSession';
+import { unlockAudio } from '../../src/utils/soundEffects';
 
 export default function UniversalQuizJoinScreen() {
   const router = useRouter();
@@ -60,6 +61,7 @@ export default function UniversalQuizJoinScreen() {
   }, [isJoined, sessionStatus]);
 
   const handlePerformJoin = async (pinToSubmit?: string) => {
+    unlockAudio();
     setErrorMsg(null);
 
     // 1. Validate Student Name

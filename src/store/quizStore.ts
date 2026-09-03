@@ -9,7 +9,7 @@ export const INITIAL_QUIZ: Quiz = {
   id: 'quiz-college-2026',
   pin: '123456',
   title: 'College Quiz 2026',
-  category: 'NIAT ADVANCE TECH CLUB',
+  category: 'NIAT ADVANCED TECH CLUB',
   description: 'Official Code in Air & Hand Gesture Technology Championship 2026.',
   durationSeconds: 200, // 10 questions × 20s = 200s
   defaultQuestionTime: 20, // default 20s per question
@@ -33,7 +33,7 @@ const getSynchronousInitialQuiz = (): Quiz => {
         if (parsed && parsed.id && Array.isArray(parsed.questions) && parsed.questions.length === 10) {
           return {
             ...parsed,
-            category: 'NIAT ADVANCE TECH CLUB',
+            category: 'NIAT ADVANCED TECH CLUB',
             durationSeconds: parsed.questions.length * (parsed.defaultQuestionTime || 20),
             status: 'READY',
             startedAt: null,
