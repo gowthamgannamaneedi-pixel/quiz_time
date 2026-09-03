@@ -99,6 +99,8 @@ const styles = StyleSheet.create({
       ? {
           cursor: 'pointer',
           userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
           touchAction: 'manipulation',
         }
       : {}),
@@ -114,7 +116,8 @@ const styles = StyleSheet.create({
   },
   disabledContainer: {
     opacity: 0.55,
-  },
+    ...(Platform.OS === 'web' ? { cursor: 'default' } : {}),
+  } as any,
   letterBadge: {
     width: 32,
     height: 32,

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   Modal,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -97,6 +98,35 @@ export default function StudentQuizScreen() {
       });
     }
   }, [isSubmitted, result]);
+
+  // Exam-Safety Protection: Prevent accidental pull-to-refresh, reload, contextmenu, and text copying
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isSubmitted) {
+        e.preventDefault();
+        e.returnValue = 'You are currently in an active examination. Leaving will submit your answers.';
+        return e.returnValue;
+      }
+    };
+
+    const handlePreventCopy = (e: Event) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('copy', handlePreventCopy);
+    document.addEventListener('cut', handlePreventCopy);
+    document.addEventListener('contextmenu', handlePreventCopy);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('copy', handlePreventCopy);
+      document.removeEventListener('cut', handlePreventCopy);
+      document.removeEventListener('contextmenu', handlePreventCopy);
+    };
+  }, [isSubmitted]);
 
   if (totalQuestions === 0 || !currentQuestion) {
     return (
@@ -329,7 +359,16 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.brandBackground,
-  },
+    ...(Platform.OS === 'web'
+      ? {
+          overscrollBehaviorY: 'none',
+          overscrollBehavior: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+        }
+      : {}),
+  } as any,
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -356,7 +395,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 24,
-  },
+    ...(Platform.OS === 'web'
+      ? {
+          overscrollBehaviorY: 'contain',
+          overscrollBehavior: 'contain',
+        }
+      : {}),
+  } as any,
   questionCard: {
     backgroundColor: theme.white,
     marginBottom: 12,
@@ -389,10 +434,24 @@ const styles = StyleSheet.create({
     color: theme.brandText,
     lineHeight: 24,
     marginBottom: 12,
-  },
+    ...(Platform.OS === 'web'
+      ? {
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+        }
+      : {}),
+  } as any,
   optionsContainer: {
     marginBottom: 16,
-  },
+    ...(Platform.OS === 'web'
+      ? {
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+        }
+      : {}),
+  } as any,
   bottomToolbar: {
     backgroundColor: theme.white,
     borderTopWidth: 1,
