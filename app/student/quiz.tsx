@@ -6,6 +6,7 @@ import {
   ScrollView,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -78,9 +79,9 @@ export default function StudentQuizScreen() {
     }
   }, [session.status, isSubmitted, submitQuiz]);
 
-  // When submitted, navigate to Result screen
+  // When submitted and session is ENDED, navigate to Result screen
   useEffect(() => {
-    if (isSubmitted && result) {
+    if (session.status === 'ENDED' && isSubmitted && result) {
       router.replace({
         pathname: '/student/result',
         params: {
@@ -97,7 +98,7 @@ export default function StudentQuizScreen() {
         },
       });
     }
-  }, [isSubmitted, result]);
+  }, [session.status, isSubmitted, result]);
 
   // Exam-Safety Protection: Prevent accidental pull-to-refresh, reload, contextmenu, and text copying
   useEffect(() => {
@@ -127,6 +128,25 @@ export default function StudentQuizScreen() {
       document.removeEventListener('contextmenu', handlePreventCopy);
     };
   }, [isSubmitted]);
+
+  if (isSubmitted && session.status === 'LIVE') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.centerContainer}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: theme.successSurface, borderWidth: 1.5, borderColor: theme.successBorder, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Ionicons name="checkmark-done" size={36} color={theme.success} />
+          </View>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: theme.brandText, textAlign: 'center', marginBottom: 8 }}>
+            Answers Submitted Successfully!
+          </Text>
+          <Text style={{ fontSize: 13, color: theme.brandTextSecondary, textAlign: 'center', lineHeight: 20, maxWidth: 320, marginBottom: 20 }}>
+            All questions have been recorded. Please wait while the administrator finalizes the examination to reveal the official leaderboard.
+          </Text>
+          <ActivityIndicator size="small" color={theme.brandBurgundy} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (totalQuestions === 0 || !currentQuestion) {
     return (

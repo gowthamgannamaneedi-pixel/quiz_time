@@ -5,6 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -37,8 +38,18 @@ export default function StudentResultScreen() {
   }>();
 
   const { quiz } = useAdminQuiz();
-  const { leaderboard, fetchLeaderboard } = useRealtimeSession();
+  const { status: sessionStatus, leaderboard, fetchLeaderboard } = useRealtimeSession();
   const [showReview, setShowReview] = useState(false);
+
+  // Authoritative State Machine Protection:
+  // Result/Leaderboard is strictly forbidden unless the authoritative session is ENDED.
+  useEffect(() => {
+    if (sessionStatus === 'WAITING' || sessionStatus === 'READY' || sessionStatus === 'DRAFT') {
+      router.replace('/student/ready');
+    } else if (sessionStatus === 'LIVE') {
+      router.replace('/student/quiz');
+    }
+  }, [sessionStatus]);
 
   const studentName = getStoredStudentName() || 'You';
   const participantId = getOrCreateParticipantId();
@@ -81,6 +92,19 @@ export default function StudentResultScreen() {
   const liveMaxScore = studentEntry && typeof studentEntry.maxScore === 'number' ? studentEntry.maxScore : maxScore;
   const liveTime = studentEntry && typeof studentEntry.timeTakenSeconds === 'number' ? studentEntry.timeTakenSeconds : timeTaken;
   const isProvisional = leaderboard.length < 5;
+
+  if (sessionStatus !== 'ENDED') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 }}>
+          <ActivityIndicator size="large" color={theme.brandBurgundy} />
+          <Text style={{ fontSize: 15, fontWeight: '700', color: theme.brandTextSecondary, textAlign: 'center' }}>
+            Syncing authoritative examination status...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
